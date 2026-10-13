@@ -1,0 +1,103 @@
+Here is a step-by-step practical dry run of both **Training** and **Inference** using a single short song snippet.
+
+---
+
+## Part 1: The Training Dry Run (How the Model Learns)
+
+Imagine our training dataset has one clean song sample:
+
+* **Prompt:** `"Upbeat pop song about a late-night drive"`
+* **Raw Lyrics:** `<VERSE_1> City lights fade behind <CHORUS> We drive into the dark`
+
+### Step 1: Sequence Assembly
+
+Our system stitches the prompt and lyrics into a single row of tokens separated by `[SEP]`:
+
+`[PROMPT] Upbeat pop song about a late-night drive [SEP] <VERSE_1> City lights fade behind <CHORUS> We drive into the dark`
+
+---
+
+### Step 2: The Random Noise Step (Selective Masking)
+
+The computer rolls a die and picks a random timestep, say $t = 0.50$ (50% noise).
+
+It leaves the prompt side **100% clean**, but replaces 50% of the lyric words on the right with `[MASK]`:
+
+`[PROMPT] Upbeat pop song about a late-night drive [SEP] <VERSE_1> City [MASK] fade [MASK] <CHORUS> We [MASK] into [MASK] dark`
+
+---
+
+### Step 3: Bidirectional Forward Pass
+
+The model looks at this entire sequence at once. Because attention is **bidirectional**, the `[MASK]` after `City` can look **left** at the prompt `"late-night drive"` and **right** at `<CHORUS> We [MASK] into [MASK] dark`.
+
+The model predicts words for every `[MASK]` slot:
+
+* Slot 1 (`City [MASK]`): Predicts **`lights`** (92% confidence)
+* Slot 2 (`fade [MASK]`): Predicts **`away`** (60% confidence) — *Original was `behind*`
+* Slot 3 (`We [MASK]`): Predicts **`drive`** (88% confidence)
+* Slot 4 (`into [MASK]`): Predicts **`the`** (95% confidence)
+
+---
+
+### Step 4: The Grading (Loss Calculation)
+
+We compare the model's predictions **only** at the masked positions against the original lyrics:
+
+* Slot 1: Predicted `lights` $\rightarrow$ Correct! (Low loss)
+* Slot 2: Predicted `away` $\rightarrow$ Wrong! Original was `behind`. (High loss)
+* Slot 3: Predicted `drive` $\rightarrow$ Correct! (Low loss)
+* Slot 4: Predicted `the` $\rightarrow$ Correct! (Low loss)
+
+The model updates its weights so that next time, given "City", "fade", and "late-night drive", it prefers "behind".
+
+---
+
+## Part 2: The Inference Dry Run (How a User Generates a Song)
+
+Now the model is trained. A user types: `"Upbeat pop song about a late-night drive"`.
+
+### Step 1: Initialization
+
+We create a sequence with the clean user prompt, a `[SEP]` divider, and a buffer of pure `[MASK]` tokens:
+
+`[PROMPT] Upbeat pop song about a late-night drive [SEP] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK]`
+
+---
+
+### Step 2: Iterative Denoising (4 Steps)
+
+#### Denoising Pass 1 ($t = 1.0 \rightarrow \text{Pure Noise}$)
+
+The model reads the prompt and looks across all 10 masks. It predicts words for everything, but only locks in its **highest confidence structural anchors**:
+
+* **Result:** `[PROMPT] ... [SEP] <VERSE_1> [MASK] [MASK] [MASK] [MASK] <CHORUS> [MASK] [MASK] [MASK] [MASK]`
+* **Locked In:** Structural tags `<VERSE_1>` and `<CHORUS>`. The rest remain `[MASK]`.
+
+---
+
+#### Denoising Pass 2 ($t = 0.75$)
+
+Now the model knows where the verse and chorus start. It re-reads the prompt *and* those locked-in structure tags, then fills in key rhyming/anchor nouns:
+
+* **Result:** `[PROMPT] ... [SEP] <VERSE_1> City [MASK] [MASK] [MASK] <CHORUS> We [MASK] [MASK] dark`
+* **Locked In:** `"City"` in the verse, `"We"` and `"dark"` in the chorus.
+
+---
+
+#### Denoising Pass 3 ($t = 0.40$)
+
+With `"City"` and `"dark"` anchored, bidirectional attention works its magic. The model connects `"City"` + `"drive"` + `"dark"` to fill in verbs and prepositions:
+
+* **Result:** `[PROMPT] ... [SEP] <VERSE_1> City lights fade [MASK] <CHORUS> We drive into [MASK] dark`
+* **Locked In:** `"lights"`, `"fade"`, `"drive"`, `"into"`.
+
+---
+
+#### Denoising Pass 4 ($t = 0.0 \rightarrow \text{Final Output}$)
+
+The final pass fills in the remaining low-uncertainty tokens:
+
+* **Result:** `[PROMPT] ... [SEP] <VERSE_1> City lights fade behind <CHORUS> We drive into the dark`
+
+The `[MASK]` buffer is 100% resolved. We strip off the prompt prefix and return the clean, formatted lyrics to the user.

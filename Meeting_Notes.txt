@@ -1,0 +1,8 @@
+diffusion models
+larger model
+make the code for any platform
+use genius for the lyrics
+use rachits  opinion on various outputs and then use it to train the model(self refinement from domain expert)
+
+----------
+research paper maybe?

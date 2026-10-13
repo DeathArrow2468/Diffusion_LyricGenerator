@@ -1,0 +1,218 @@
+Here is the complete, end-to-end technical pipeline. It breaks down every phase of the architecture, explaining **what** each component does, **why** it exists, and **how** the scaled-down setup (RTX 3060) seamlessly bridges to the production setup (H100).
+
+---
+
+## Hardware Configuration Matrix
+
+| Component / Setting | Scaled-Down Prototype (RTX 3060 8GB) | Production Model (H100 80GB) |
+| --- | --- | --- |
+| **Backbone Model** | `Qwen2.5-0.5B` or `Llama-3.2-1B` | `Qwen2.5-3B` or `Llama-3.2-3B` |
+| **Model Weight VRAM** | ~1.0 GB (`bfloat16`) | ~6.0 GB (`bfloat16`) |
+| **Max Sequence Length** | 256 tokens | 512 to 1024 tokens |
+| **Micro Batch Size** | 2 per GPU | 32 to 64 per GPU |
+| **Grad Accumulation** | 8 steps (Effective Batch = 16) | 1 step |
+| **Dataset Size** | 1,000 – 5,000 song chunks (`jsonl`) | Millions of songs (`parquet` / streaming) |
+| **Prompt Synthesis** | Offline batch script via local Ollama | Pre-computed dataset or dynamic templates |
+
+---
+
+## Phase 1: Data Preprocessing & Offline Prompt Synthesis
+
+### What
+
+A two-step data transformation layer that turns raw lyric files and metadata into structured, prompt-conditioned training samples.
+
+### Why
+
+1. **Prevent Training Starvation:** Calling an LLM or running expensive string manipulation inside the PyTorch `DataLoader` during training creates CPU bottlenecks that leave the GPU idling.
+2. **Standardize Conditioning:** The model needs a predictable interface mapping textual prompts to structured lyric targets.
+
+### How
+
+* **Step 1 (Offline Prompting):** Run an offline Python script (`prepare_data.py`) using local Ollama (`qwen2.5:3b`) to convert metadata JSON files into 3–5 varied natural language prompts per song.
+* **Step 2 (Structural Formatting):** Parse song lyrics to replace plain text headers with single-token placeholders.
+* **Output Format (`train_data.jsonl`):**
+```json
+{"prompt": "Write a fast-paced 90s rock song about overcoming failure", "lyrics": "<VERSE_1> Running through the night... <CHORUS> I won't back down..."}
+
+```
+
+
+
+---
+
+## Phase 2: Tokenizer Expansion & Vocabulary Alignment
+
+### What
+
+Extending the base model's Byte-Pair Encoding (BPE) tokenizer to include special control tokens for song structure.
+
+### Why
+
+If structural markers like `[Chorus]` remain unhandled, the tokenizer splits them into subwords (`[` + `Ch` + `orus` + `]`). The model treats them as standard text rather than atomic structural boundaries.
+
+### How
+
+1. **Token Injection:** Add custom tokens to the tokenizer:
+```python
+special_tokens = ["<VERSE_1>", "<VERSE_2>", "<CHORUS>", "<BRIDGE>", "<OUTRO>", "[SEP]"]
+tokenizer.add_special_tokens({"additional_special_tokens": special_tokens})
+
+```
+
+
+2. **Embedding Matrix Resizing:** Immediately expand the model’s embedding weight matrix so new token IDs map to trainable parameters:
+```python
+model.resize_token_embeddings(len(tokenizer))
+
+```
+
+
+
+---
+
+## Phase 3: The Selective Masking DataLoader (`collate_fn`)
+
+### What
+
+The dynamic engine inside PyTorch that constructs input sequences, samples the noise level $t$, and applies selective token corruption.
+
+### Why
+
+In conditional text diffusion, **the prompt must never be masked**. The prompt serves as the continuous conditioning signal $C$. Only the target lyric sequence $X$ undergoes corruption and reconstruction.
+
+### How
+
+For each batch in `collate_fn`:
+
+1. **Sequence Construction:** Concatenate prompt and lyrics into a 1D tensor:
+`[BOS] {Prompt Tokens} [SEP] {Lyric Tokens} [EOS]`
+2. **Sample Timestep $t$:** Draw a uniform random scalar $t \in (0, 1]$ for each batch item.
+3. **Calculate Masking Ratio:** Compute mask percentage $r = t$ (or cosine noise schedule $r = \sin(\frac{\pi}{2} t)$).
+4. **Selective Corruption:**
+* Tokens *before* `[SEP]` remain untouched.
+* A percentage $r$ of lyric tokens *after* `[SEP]` are randomly replaced with the `[MASK]` token ID.
+
+
+5. **Generate Labels:** Create a target tensor where non-masked positions are assigned `-100` (ignored by PyTorch loss functions), leaving only the masked token positions for loss calculation.
+
+---
+
+## Phase 4: Model Architecture Modifications
+
+### What
+
+Wrapping the open-source Transformer backbone inside a custom PyTorch module (`BidirectionalDiffusionTransformer`) that incorporates **Bidirectional Attention** and **Timestep Injection**.
+
+```
+Input Token IDs ──► Token Embeddings ──┐
+                                       ├──► (+) ──► [Bidirectional Transformer Layers] ──► Logits
+Timestep (t)    ──► Timestep MLP     ──┘
+
+```
+
+### Why
+
+1. **Non-Causal Attention:** Autoregressive models use a triangular causal mask so token $N$ cannot see token $N+1$. Removing this mask allows every token to attend to all other tokens simultaneously. A `[MASK]` in Verse 1 can adjust its prediction based on a generated token in the Chorus, guaranteeing global rhyming and structural consistency.
+2. **Timestep Awareness:** The model must adapt its generation strategy depending on noise level. At $t \approx 1$ (mostly masked), it predicts high-level structural anchors. At $t \approx 0$ (partially masked), it refines grammar and local rhyming.
+
+### How
+
+1. **Remove Causal Masking:** Override the attention mask in the underlying Transformer blocks so attention is unconstrained ($N \times N$ matrix of ones).
+2. **Timestep Embedder Module:**
+* Convert scalar $t$ into a fixed sinusoidal vector of size `hidden_dim`.
+* Pass it through a 2-layer MLP (`Linear` $\rightarrow$ `SiLU` $\rightarrow$ `Linear`).
+* Add the output vector $e_t$ to the token embeddings before passing them into Layer 1 of the Transformer stack.
+
+
+
+---
+
+## Phase 5: Training Loop & Loss Objective
+
+### What
+
+The execution loop that computes masked cross-entropy loss, updates model weights, and saves checkpoints.
+
+### Why
+
+Using standard `CrossEntropyLoss` on discrete vocabulary outputs avoids the instability and rounding errors common in continuous vector diffusion models.
+
+### How
+
+```python
+# Pure PyTorch Training Step
+optimizer.zero_grad()
+
+with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+    # Forward pass through custom bidirectional model
+    logits = model(noisy_input_ids, timesteps=t) 
+    
+    # Compute loss ONLY on [MASK] positions (labels == -100 are ignored)
+    loss = criterion(logits.view(-1, vocab_size), labels.view(-1))
+
+# Backpropagation with AMP
+scaler.scale(loss).backward()
+scaler.step(optimizer)
+scaler.update()
+
+```
+
+---
+
+## Phase 6: Reverse Sampling Loop (Inference Engine)
+
+### What
+
+The iterative generation process that turns a prompt and a buffer of `[MASK]` tokens into completed song lyrics.
+
+### Why
+
+Generating all tokens iteratively over $N$ steps (e.g., $N=50$) allows the model to lock in high-confidence words first and use them as context to resolve remaining ambiguous masks.
+
+### How
+
+1. **Initialization:** Prepare input sequence:
+`[BOS] {User Prompt} [SEP] [MASK] [MASK] [MASK] ... [MASK]` (up to `max_len`).
+2. **Iterative Denoising Loop (for $step = N$ down to $1$):**
+* Calculate current noise level $t = step / N$.
+* Pass current sequence through the model to get probability distributions for all remaining `[MASK]` positions.
+* Select top-$k$ highest confidence predictions and permanently replace those `[MASK]` positions with predicted token IDs.
+* Keep low-confidence positions as `[MASK]` for the next iteration.
+
+
+3. **Termination:** Truncate output at the first generated `<EOS>` or `<PAD>` block and decode token IDs into text.
+
+---
+
+## Modular Project Directory Structure
+
+To transition from local prototyping to cloud execution by changing a single config variable, organize the codebase as follows:
+
+```text
+lyric_diffusion/
+├── config.py             # Global settings (model_name, batch_size, sequence_length)
+├── prepare_data.py       # Offline script: Ollama prompt synthesis & dataset cleaning
+├── dataset.py            # PyTorch Dataset & selective masking collate_fn
+├── model.py              # Timestep MLP & Bidirectional Transformer wrapper
+├── train.py              # Pure PyTorch training loop with AMP & checkpointing
+└── sample.py             # Reverse diffusion sampling engine for inference
+
+```
+
+When switching from the RTX 3060 to the H100, update `config.py`:
+
+```python
+# Local RTX 3060 Config
+MODEL_NAME = "Qwen/Qwen2.5-0.5B"
+MAX_SEQ_LEN = 256
+BATCH_SIZE = 2
+GRAD_ACCUM = 8
+
+# H100 Scale-Up Config (Uncomment when deployed)
+# MODEL_NAME = "Qwen/Qwen2.5-3B"
+# MAX_SEQ_LEN = 512
+# BATCH_SIZE = 32
+# GRAD_ACCUM = 1
+
+```
