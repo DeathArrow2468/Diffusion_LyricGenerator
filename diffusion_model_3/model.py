@@ -25,6 +25,12 @@ class TimestepEmbedder(nn.Module):
             nn.Linear(hidden_dim, hidden_dim)
         )
 
+        # Initialize the final linear layer to output near-zero values initially.
+        # This prevents the random MLP weights from destroying the pre-trained Qwen embeddings.
+        nn.init.zeros_(self.mlp[2].weight)
+        nn.init.zeros_(self.mlp[2].bias)
+
+
     def forward(self, timesteps):
         """
         Takes a batch of timesteps (shape: [Batch_size]) 
