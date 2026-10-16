@@ -1,0 +1,24 @@
+timestamp_utc,prompt,generated_lyrics,generation_seconds,checkpoint,lyric_tokens,denoising_steps,temperature,top_k,seed,device,dtype,first_generation
+2026-10-16T19:01:48.923058+00:00,"Write an upbeat pop song about driving through a city late at night with your closest friend, leaving your worries behind. Use vivid imagery of neon lights and empty streets, two verses, and a catchy chorus about feeling free.",",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,",1.197735,C:\Users\Faiz\Desktop\Diffusion_LyricGenerator\training_4\checkpoints_2_7_1e-4\diffusion_epoch_7.pt,128,32,0.0,50,42,cuda,torch.bfloat16,True
+2026-10-16T19:12:17.159525+00:00,"Write an upbeat pop song about driving through a city late at night with your closest friend, leaving your worries behind. Use vivid imagery of neon lights and empty streets, two verses, and a catchy chorus about feeling free.",",,,,,,,,,,,'s,,,, I,,,,,,,,,,,,?,,,,,,,,, I,,,,,',, I,,, (,,,,,,,,,,, I,,, I,,,, I,,,,,,, I,,,,,,,,,,,,,,'s,,,, And, to,,, I,,,,,,,,,,,,,,,,,,,,",1.541926,C:\Users\Faiz\Desktop\Diffusion_LyricGenerator\training_4\checkpoints_2_7_1e-4\diffusion_epoch_7.pt,128,32,0.8,50,42,cuda,torch.bfloat16,True
+2026-10-16T19:17:29.040779+00:00,"Write an upbeat pop song about driving through a city late at night with your closest friend, leaving your worries behind. Use vivid imagery of neon lights and empty streets, two verses, and a catchy chorus about feeling free."," can' the for of'm I andOR't be's me you all,' ( (, the don a ( I in you it with's I you IOR, I's the<CHORUS> on I that that, for and,'t I) in for I that And the Ioh the in, I mein I to can can it to you the I''s the<CHORUS> it're the the,'t you the you, the, I) you you theoh the ( that me that I  you a,'t, And it you,, to a to,,, I,, me < <in a of<CHORUS>",0.971199,C:\Users\Faiz\Desktop\Diffusion_LyricGenerator\training_4\checkpoints_2_7_1e-4\diffusion_epoch_7.pt,128,32,0.8,50,42,cuda,torch.bfloat16,True
+2026-10-16T19:32:19.210192+00:00,"Write an upbeat pop song about driving through a city late at night with your closest friend, leaving your worries behind. Use vivid imagery of neon lights and empty streets, two verses, and a catchy chorus about feeling free."," The chorus should also include a motivational message and a call-to-action to join your friend in enjoying the night. Don't forget to write a creative lyric about your favorite city and the feeling of being surrounded by strangers. Use a mix of instruments, including guitar, piano, and keyboards, to create a unique rhythm and style. Title: ""City Lights""
+Verse 1:
+I wake up late with the sun on my face, and I feel like I'm in a city.
+Every light in every street, it's buzzing and alive.
+I listen to my headphones, the music is so loud,
+And I'm ready to hit the road",3.091505,BASE:Qwen/Qwen2.5-0.5B,128,0,0.8,50,42,cuda,torch.bfloat16,True
+2026-10-16T19:33:14.109231+00:00,"Write an upbeat pop song about driving through a city late at night with your closest friend, leaving your worries behind. Use vivid imagery of neon lights and empty streets, two verses, and a catchy chorus about feeling free in 100 words"," or less.
+Verse 1:
+I'm a driver, I'm a city dweller
+Riding through the lights, my heart beats fast
+The neon signs glow, the city's wide awake
+With me by my side, no worries to be seen
+
+Chorus:
+I'm free in 100, free in 100, my worries gone
+I'm free in 100, free in 100, my worries gone
+I'm free in 100, free in 100, my worries gone
+
+Verse 2:
+The silence is heavy, the cars are",3.192178,BASE:Qwen/Qwen2.5-0.5B,128,0,0.8,50,42,cuda,torch.bfloat16,True
