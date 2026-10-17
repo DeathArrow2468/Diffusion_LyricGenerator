@@ -1,87 +1,100 @@
-"""
-Save as Diffusion_LyricGenerator/test_5/test_lyrics.py.
-
-Base model:
-    python test_5/test_lyrics.py --base-model
-
-Trained diffusion model:
-    python test_5/test_lyrics.py
-
-Diffusion diagnostics:
-    python test_5/test_lyrics.py --diagnostics --reconstruction-check
-
-Each run accepts one prompt, appends one result to test_5/results.csv,
-and exits. Existing CSV rows are preserved.
-
-Generation timing includes tokenization, inference, and decoding.
-Model loading and CSV writing are excluded. Optional reconstruction
-checks run outside the timer.
-
-Base mode loads the original causal model without diffusion weights,
-custom tokens, timestep embeddings, or modified attention. CSV rows
-identify it as BASE:<model name>, with denoising_steps=0.
-
-Diffusion mode chooses masked positions randomly before sampling
-their tokens. This avoids the previous token-dependent acceptance
-bias, but cannot repair a poorly trained checkpoint.
-
-Keep the training configuration and token definitions unchanged.
-"""
+"""Test one lyric prompt per run and append the result to test_5/results.csv."""
 
 from __future__ import annotations
 
 import argparse
 from collections import Counter
 import csv
-from datetime import datetime, timezone
 import gc
 import importlib.util
 import json
 import math
 import os
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 import time
 
 
-FIELDS = [
-    "timestamp_utc",
-    "prompt",
-    "generated_lyrics",
-    "generation_seconds",
-    "checkpoint",
-    "lyric_tokens",
-    "denoising_steps",
-    "temperature",
-    "top_k",
-    "seed",
-    "device",
-    "dtype",
-    "first_generation",
+FIELDS = ["Prompt", "Generated Lyrics", "Time taken", "Base Model"]
+
+LEGACY_FIELDS = [
+    "timestamp_utc", "prompt", "generated_lyrics", "generation_seconds",
+    "checkpoint", "lyric_tokens", "denoising_steps", "temperature",
+    "top_k", "seed", "device", "dtype", "first_generation",
 ]
 
 
 def read_module(name, path):
     spec = importlib.util.spec_from_file_location(name, path)
-
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load {path}")
-
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
+def single_line(value):
+    return " ".join(str(value).splitlines())
 
 def append_result(path, row):
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists() and path.stat().st_size > 0
 
     if exists:
-        with path.open("r", encoding="utf-8-sig", newline="") as f:
-            if next(csv.reader(f), None) != FIELDS:
-                raise ValueError(
-                    f"CSV header differs: choose a new --output path: {path}"
-                )
+        with path.open("r", encoding="utf-8-sig", newline="") as old_file:
+            reader = csv.DictReader(old_file)
+            old_fields = reader.fieldnames
+            legacy_rows = (
+                list(reader) if old_fields == LEGACY_FIELDS else None
+            )
+
+        if old_fields == LEGACY_FIELDS:
+            backup = path.with_name(path.name + ".backup")
+            if not backup.exists():
+                shutil.copy2(path, backup)
+
+            temporary_path = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    newline="",
+                    dir=path.parent,
+                    prefix=path.name + ".",
+                    suffix=".tmp",
+                    delete=False,
+                ) as temporary:
+                    temporary_path = Path(temporary.name)
+                    writer = csv.DictWriter(
+                        temporary,
+                        fieldnames=FIELDS,
+                    )
+                    writer.writeheader()
+
+                    for old in legacy_rows:
+                        writer.writerow({
+                            "Prompt": old["prompt"],
+                            "Generated Lyrics": old["generated_lyrics"],
+                            "Time taken": old["generation_seconds"],
+                            "Base Model": old["checkpoint"].startswith(
+                                "BASE:"
+                            ),
+                        })
+
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+
+                os.replace(temporary_path, path)
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
+
+        elif old_fields != FIELDS:
+            raise ValueError(
+                f"Unrecognized CSV header in {path}; "
+                "choose a different --output path."
+            )
 
     with path.open("a", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
@@ -89,7 +102,11 @@ def append_result(path, row):
         if not exists:
             writer.writeheader()
 
-        writer.writerow(row)
+        writer.writerow({
+            **row,
+            "Prompt": single_line(row["Prompt"]),
+            "Generated Lyrics": single_line(row["Generated Lyrics"]),
+        })
         f.flush()
         os.fsync(f.fileno())
 
@@ -97,15 +114,16 @@ def append_result(path, row):
 def generate(model, tokenizer, cfg, prompt, args, device):
     import torch
 
-    prompt_ids = tokenizer.encode(prompt, add_special_tokens=False)
+    prompt_ids = tokenizer.encode(
+        prompt,
+        add_special_tokens=False,
+    )
     bos = (
-        []
-        if tokenizer.bos_token_id is None
+        [] if tokenizer.bos_token_id is None
         else [tokenizer.bos_token_id]
     )
     eos = (
-        []
-        if tokenizer.eos_token_id is None
+        [] if tokenizer.eos_token_id is None
         else [tokenizer.eos_token_id]
     )
 
@@ -136,26 +154,37 @@ def generate(model, tokenizer, cfg, prompt, args, device):
         dtype=torch.long,
     )
     attention = (ids != tokenizer.pad_token_id).long()
-    remaining = torch.ones(n, dtype=torch.bool, device=device)
+    remaining = torch.ones(
+        n,
+        dtype=torch.bool,
+        device=device,
+    )
 
     structure_ids = set(
         tokenizer.convert_tokens_to_ids(cfg.STRUCTURAL_TOKENS)
     )
     forbidden = set(tokenizer.all_special_ids) - structure_ids
-    forbidden.update([sep_id, mask_id, tokenizer.pad_token_id])
+    forbidden.update([
+        sep_id,
+        mask_id,
+        tokenizer.pad_token_id,
+    ])
 
     if tokenizer.eos_token_id is not None:
         forbidden.add(tokenizer.eos_token_id)
 
-    forbidden = sorted(x for x in forbidden if x is not None)
+    forbidden = sorted(
+        x for x in forbidden if x is not None
+    )
+
     steps = min(args.steps, n)
     diagnostics = []
 
     with torch.inference_mode():
         for step in range(steps):
             positions = torch.where(remaining)[0]
-
             t = max(0.1, positions.numel() / n)
+
             times = torch.tensor(
                 [t],
                 device=device,
@@ -163,7 +192,11 @@ def generate(model, tokenizer, cfg, prompt, args, device):
             )
 
             all_logits = model(ids, attention, times)
-            scores = all_logits[0, start + positions, :].float()
+            scores = all_logits[
+                0,
+                start + positions,
+                :,
+            ].float()
             del all_logits
 
             scores[:, forbidden] = -float("inf")
@@ -182,7 +215,10 @@ def generate(model, tokenizer, cfg, prompt, args, device):
             if args.diagnostics and step == 0:
                 first_probs = scores[0].softmax(-1)
                 values, indices = first_probs.topk(
-                    min(5, scores.shape[-1] - len(forbidden))
+                    min(
+                        5,
+                        scores.shape[-1] - len(forbidden),
+                    )
                 )
 
                 guesses = scores.argmax(-1).tolist()
@@ -191,7 +227,8 @@ def generate(model, tokenizer, cfg, prompt, args, device):
                 ).most_common(1)[0]
 
                 diagnostics.append(
-                    f"First pass: {dominant_count}/{len(guesses)} "
+                    f"First pass: "
+                    f"{dominant_count}/{len(guesses)} "
                     "masked positions have "
                     f"{tokenizer.decode([dominant_id])!r} "
                     "as their greedy prediction."
@@ -205,17 +242,19 @@ def generate(model, tokenizer, cfg, prompt, args, device):
                         values.tolist(),
                     )
                 )
-
                 diagnostics.append(
                     "First masked position, "
                     "allowed-vocabulary probabilities: "
                     + predictions
                 )
-
                 del first_probs
 
-            target_filled = math.ceil(n * (step + 1) / steps)
-            count = target_filled - (n - positions.numel())
+            target_filled = math.ceil(
+                n * (step + 1) / steps
+            )
+            count = target_filled - (
+                n - positions.numel()
+            )
 
             chosen = torch.randperm(
                 positions.numel(),
@@ -228,7 +267,9 @@ def generate(model, tokenizer, cfg, prompt, args, device):
             if args.temperature == 0:
                 candidates = scores.argmax(dim=-1)
             else:
-                sample_scores = scores / args.temperature
+                sample_scores = (
+                    scores / args.temperature
+                )
 
                 if args.top_k > 0:
                     k = min(
@@ -236,9 +277,8 @@ def generate(model, tokenizer, cfg, prompt, args, device):
                         scores.shape[-1] - len(forbidden),
                     )
 
-                    values, indices = sample_scores.topk(
-                        k,
-                        dim=-1,
+                    values, indices = (
+                        sample_scores.topk(k, dim=-1)
                     )
                     sampled = torch.multinomial(
                         values.softmax(-1),
@@ -257,7 +297,10 @@ def generate(model, tokenizer, cfg, prompt, args, device):
             ids[0, start + accepted] = candidates
             remaining[accepted] = False
 
-    generated = ids[0, start:start + n].tolist()
+    generated = ids[
+        0,
+        start:start + n,
+    ].tolist()
 
     lyrics = tokenizer.decode(
         generated,
@@ -266,11 +309,14 @@ def generate(model, tokenizer, cfg, prompt, args, device):
     )
 
     if args.diagnostics:
-        token_id, count = Counter(generated).most_common(1)[0]
+        token_id, count = Counter(
+            generated
+        ).most_common(1)[0]
 
         diagnostics.append(
-            f"Final output: {len(set(generated))}/{n} "
-            "unique token IDs; most frequent token "
+            f"Final output: "
+            f"{len(set(generated))}/{n} unique token IDs; "
+            f"most frequent token "
             f"{tokenizer.decode([token_id])!r} "
             f"occurs {count}/{n} times."
         )
@@ -278,14 +324,23 @@ def generate(model, tokenizer, cfg, prompt, args, device):
     return lyrics, steps, diagnostics
 
 
-def reconstruction_check(model, tokenizer, cfg, root, device, seed):
+def reconstruction_check(
+    model,
+    tokenizer,
+    cfg,
+    root,
+    device,
+    seed,
+):
     import torch
     import torch.nn.functional as F
 
     data_path = Path(cfg.DATASET_PATH)
 
     if not data_path.is_file():
-        data_path = root / "Dataset_maker_1/train_data.jsonl"
+        data_path = (
+            root / "Dataset_maker_1/train_data.jsonl"
+        )
 
     if not data_path.is_file():
         raise FileNotFoundError(
@@ -293,18 +348,21 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
         )
 
     bos = (
-        []
-        if tokenizer.bos_token_id is None
+        [] if tokenizer.bos_token_id is None
         else [tokenizer.bos_token_id]
     )
     eos = (
-        []
-        if tokenizer.eos_token_id is None
+        [] if tokenizer.eos_token_id is None
         else [tokenizer.eos_token_id]
     )
 
-    sep_id = tokenizer.convert_tokens_to_ids(cfg.SEP_TOKEN)
-    mask_id = tokenizer.convert_tokens_to_ids(cfg.MASK_TOKEN)
+    sep_id = tokenizer.convert_tokens_to_ids(
+        cfg.SEP_TOKEN
+    )
+    mask_id = tokenizer.convert_tokens_to_ids(
+        cfg.MASK_TOKEN
+    )
+
     example = None
 
     with data_path.open(encoding="utf-8-sig") as f:
@@ -323,7 +381,11 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
                 + [sep_id]
             )
 
-            available = cfg.MAX_SEQ_LEN - len(prefix) - len(eos)
+            available = (
+                cfg.MAX_SEQ_LEN
+                - len(prefix)
+                - len(eos)
+            )
 
             if available < 16:
                 continue
@@ -333,13 +395,15 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
                 add_special_tokens=False,
             )[:available]
 
+            excluded = {
+                tokenizer.pad_token_id,
+                tokenizer.eos_token_id,
+            }
+
             allowed = [
                 i
                 for i, token in enumerate(lyrics)
-                if token not in {
-                    tokenizer.pad_token_id,
-                    tokenizer.eos_token_id,
-                }
+                if token not in excluded
             ]
 
             if len(allowed) >= 16:
@@ -358,7 +422,13 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
             "16 maskable lyric tokens found."
         )
 
-    item, prefix, lyrics, allowed, line_number = example
+    (
+        item,
+        prefix,
+        lyrics,
+        allowed,
+        line_number,
+    ) = example
 
     sequence = prefix + lyrics + eos
     sequence += [tokenizer.pad_token_id] * (
@@ -370,7 +440,9 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
         dtype=torch.long,
         device=device,
     )
-    attention = (clean != tokenizer.pad_token_id).long()
+    attention = (
+        clean != tokenizer.pad_token_id
+    ).long()
 
     positions = (
         torch.tensor(
@@ -381,7 +453,10 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
         + len(prefix)
     )
 
-    rng = torch.Generator(device=device).manual_seed(seed)
+    rng = torch.Generator(
+        device=device
+    ).manual_seed(seed)
+
     order = torch.randperm(
         positions.numel(),
         device=device,
@@ -389,8 +464,9 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
     )
 
     print(
-        f"\nReconstruction probe: training data line "
-        f"{line_number}; {len(allowed)} maskable tokens."
+        f"\nReconstruction probe: training data "
+        f"line {line_number}; "
+        f"{len(allowed)} maskable tokens."
     )
     print("Training prompt:", item["prompt"])
     print(
@@ -420,12 +496,23 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
                 device=device,
             )
 
-            all_logits = model(corrupted, attention, t)
-            scores = all_logits[0, selected].float()
+            all_logits = model(
+                corrupted,
+                attention,
+                t,
+            )
+            scores = all_logits[
+                0,
+                selected,
+            ].float()
             del all_logits
 
             targets = clean[0, selected]
-            loss = F.cross_entropy(scores, targets).item()
+            loss = F.cross_entropy(
+                scores,
+                targets,
+            ).item()
+
             predictions = scores.argmax(-1)
             accuracy = (
                 (predictions == targets)
@@ -442,7 +529,7 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
                 f"Mask {fraction:.0%}: "
                 f"cross-entropy={loss:.4f}; "
                 f"exact token accuracy={accuracy:.2%}; "
-                "most common prediction="
+                f"most common prediction="
                 f"{tokenizer.decode([token_id])!r} "
                 f"({frequency}/{count})."
             )
@@ -453,7 +540,8 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
 
                 excerpt = rebuilt[
                     0,
-                    len(prefix):len(prefix) + min(40, len(lyrics)),
+                    len(prefix):len(prefix)
+                    + min(40, len(lyrics)),
                 ].tolist()
 
                 print(
@@ -474,13 +562,19 @@ def reconstruction_check(model, tokenizer, cfg, root, device, seed):
 
 def run_base_model(cfg, args, output):
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+    )
 
     chosen_device = (
         "cuda" if torch.cuda.is_available() else "cpu"
     ) if args.device == "auto" else args.device
 
-    if chosen_device == "cuda" and not torch.cuda.is_available():
+    if (
+        chosen_device == "cuda"
+        and not torch.cuda.is_available()
+    ):
         raise RuntimeError(
             "CUDA is unavailable in this Python environment."
         )
@@ -489,7 +583,10 @@ def run_base_model(cfg, args, output):
 
     dtype = (
         torch.bfloat16
-        if device.type == "cuda" and torch.cuda.is_bf16_supported()
+        if (
+            device.type == "cuda"
+            and torch.cuda.is_bf16_supported()
+        )
         else torch.float32
     )
 
@@ -502,7 +599,9 @@ def run_base_model(cfg, args, output):
         "Diffusion checkpoint weights are not loaded."
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(
+        cfg.MODEL_NAME
+    )
 
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -550,6 +649,7 @@ def run_base_model(cfg, args, output):
     ).to(device)
 
     prefix_length = inputs["input_ids"].shape[1]
+
     context_limit = getattr(
         model.config,
         "max_position_embeddings",
@@ -558,7 +658,8 @@ def run_base_model(cfg, args, output):
 
     if (
         context_limit is not None
-        and prefix_length + args.lyric_tokens > context_limit
+        and prefix_length + args.lyric_tokens
+        > context_limit
     ):
         raise ValueError(
             "Prompt plus requested output exceeds "
@@ -589,7 +690,10 @@ def run_base_model(cfg, args, output):
             **generation_options,
         )
 
-    new_ids = generated[0, prefix_length:].tolist()
+    new_ids = generated[
+        0,
+        prefix_length:,
+    ].tolist()
 
     lyrics = tokenizer.decode(
         new_ids,
@@ -602,45 +706,42 @@ def run_base_model(cfg, args, output):
 
     elapsed = time.perf_counter() - start_time
 
-    row = dict(zip(FIELDS, [
-        datetime.now(timezone.utc).isoformat(),
-        prompt,
-        lyrics,
-        f"{elapsed:.6f}",
-        f"BASE:{cfg.MODEL_NAME}",
-        len(new_ids),
-        0,
-        args.temperature,
-        args.top_k,
-        args.seed,
-        str(device),
-        str(dtype),
-        True,
-    ]))
+    row = {
+        "Prompt": prompt,
+        "Generated Lyrics": lyrics,
+        "Time taken": f"{elapsed:.6f}",
+        "Base Model": True,
+    }
 
     if args.diagnostics:
         print(
-            f"Base autoregressive generation: {len(new_ids)} "
-            "new tokens (including any ending special token)."
+            f"Base autoregressive generation: "
+            f"{len(new_ids)} new tokens "
+            "(including any ending special token)."
         )
 
     try:
         append_result(output, row)
     except (OSError, ValueError):
         print(
-            f"CSV save failed. Generated text:\n{lyrics}"
-            f"\nSeconds: {elapsed:.6f}"
+            f"CSV save failed. Generated text:\n"
+            f"{lyrics}\nSeconds: {elapsed:.6f}"
         )
         raise
 
     print(
-        f"\n{lyrics}\n\nGeneration: {elapsed:.3f} seconds."
+        f"\n{lyrics}\n\n"
+        f"Generation: {elapsed:.3f} seconds."
     )
-    print(f"Appended one BASE result to {output}")
+    print(
+        f"Appended one BASE result to {output}"
+    )
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__
+    )
 
     parser.add_argument(
         "--checkpoint",
@@ -652,27 +753,51 @@ def main():
     parser.add_argument(
         "--output",
         default="results.csv",
-        help="CSV path relative to test_5, or an absolute path.",
+        help=(
+            "CSV path relative to test_5, "
+            "or an absolute path."
+        ),
     )
     parser.add_argument(
         "--prompt",
-        help="Supply one prompt here, or omit to enter one when asked.",
+        help=(
+            "Supply one prompt here, or omit "
+            "to enter one when asked."
+        ),
     )
-    parser.add_argument("--lyric-tokens", type=int, default=128)
-    parser.add_argument("--steps", type=int, default=32)
+    parser.add_argument(
+        "--lyric-tokens",
+        type=int,
+        default=128,
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=32,
+    )
     parser.add_argument(
         "--temperature",
         type=float,
         default=0.8,
-        help="Default 0.8 samples tokens; 0 uses greedy predictions.",
+        help=(
+            "Default 0.8 samples tokens; "
+            "0 uses greedy predictions."
+        ),
     )
     parser.add_argument(
         "--top-k",
         type=int,
         default=50,
-        help="Used for sampling; 0 disables it.",
+        help=(
+            "Used for sampling; "
+            "0 disables it."
+        ),
     )
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+    )
     parser.add_argument(
         "--device",
         choices=["auto", "cuda", "cpu"],
@@ -681,25 +806,38 @@ def main():
     parser.add_argument(
         "--diagnostics",
         action="store_true",
-        help="Print model predictions and token repetition.",
+        help=(
+            "Print model predictions "
+            "and token repetition."
+        ),
     )
     parser.add_argument(
         "--reconstruction-check",
         action="store_true",
-        help="Probe masked-token recovery on one training example.",
+        help=(
+            "Probe masked-token recovery "
+            "on one training example."
+        ),
     )
     parser.add_argument(
         "--base-model",
         action="store_true",
-        help="Use original Qwen with autoregressive generation.",
+        help=(
+            "Use original Qwen with "
+            "autoregressive generation."
+        ),
     )
 
     args = parser.parse_args()
 
-    if args.base_model and args.reconstruction_check:
+    if (
+        args.base_model
+        and args.reconstruction_check
+    ):
         parser.error(
-            "--reconstruction-check applies to the diffusion model; "
-            "omit it for --base-model."
+            "--reconstruction-check applies to "
+            "the diffusion model; omit it "
+            "for --base-model."
         )
 
     if (
@@ -716,16 +854,28 @@ def main():
         not math.isfinite(args.temperature)
         or args.temperature < 0
     ):
-        parser.error("Temperature must be finite and nonnegative.")
+        parser.error(
+            "Temperature must be finite "
+            "and nonnegative."
+        )
 
     test_dir = Path(__file__).resolve().parent
     root = test_dir.parent
-    checkpoint = (root / args.checkpoint).resolve()
-    output = (test_dir / args.output).resolve()
 
-    if not args.base_model and not checkpoint.is_file():
+    checkpoint = (
+        root / args.checkpoint
+    ).resolve()
+    output = (
+        test_dir / args.output
+    ).resolve()
+
+    if (
+        not args.base_model
+        and not checkpoint.is_file()
+    ):
         parser.error(
-            f"Checkpoint not found: {checkpoint}. "
+            f"Checkpoint not found: "
+            f"{checkpoint}. "
             "Use --checkpoint to choose one."
         )
 
@@ -734,17 +884,25 @@ def main():
 
     if (
         not config_path.is_file()
-        or (not args.base_model and not model_path.is_file())
+        or (
+            not args.base_model
+            and not model_path.is_file()
+        )
     ):
         parser.error(
-            "Place test_lyrics.py inside the project's test_5 folder. "
-            "training_4 and diffusion_model_3 should be sibling folders."
+            "Place test_lyrics.py inside "
+            "the project's test_5 folder. "
+            "training_4 and diffusion_model_3 "
+            "should be sibling folders."
         )
 
     import torch
     from transformers import AutoTokenizer
 
-    cfg = read_module("_lyric_training_config", config_path)
+    cfg = read_module(
+        "_lyric_training_config",
+        config_path,
+    )
 
     if args.base_model:
         run_base_model(cfg, args, output)
@@ -754,7 +912,10 @@ def main():
     sys.modules["config"] = cfg
 
     try:
-        module = read_module("_lyric_diffusion_model", model_path)
+        module = read_module(
+            "_lyric_diffusion_model",
+            model_path,
+        )
     finally:
         if previous_config is None:
             sys.modules.pop("config", None)
@@ -762,24 +923,33 @@ def main():
             sys.modules["config"] = previous_config
 
     chosen_device = (
-        "cuda" if torch.cuda.is_available() else "cpu"
+        "cuda" if torch.cuda.is_available()
+        else "cpu"
     ) if args.device == "auto" else args.device
 
-    if chosen_device == "cuda" and not torch.cuda.is_available():
+    if (
+        chosen_device == "cuda"
+        and not torch.cuda.is_available()
+    ):
         parser.error(
-            "CUDA is unavailable in this Python environment."
+            "CUDA is unavailable in this "
+            "Python environment."
         )
 
     device = torch.device(chosen_device)
 
     dtype = (
         torch.bfloat16
-        if device.type == "cuda" and torch.cuda.is_bf16_supported()
+        if (
+            device.type == "cuda"
+            and torch.cuda.is_bf16_supported()
+        )
         else torch.float32
     )
 
     print(
-        f"Device: {device}; dtype: {dtype}; "
+        f"Device: {device}; "
+        f"dtype: {dtype}; "
         f"checkpoint: {checkpoint}"
     )
     print(
@@ -787,7 +957,9 @@ def main():
         "(excluded from generation timing)..."
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(cfg.MODEL_NAME)
+    tokenizer = AutoTokenizer.from_pretrained(
+        cfg.MODEL_NAME
+    )
 
     tokenizer.add_special_tokens({
         "additional_special_tokens": (
@@ -797,16 +969,21 @@ def main():
     })
 
     if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token = (
+            tokenizer.eos_token
+        )
 
     if tokenizer.pad_token_id is None:
         raise ValueError(
-            "Training tokenizer requires a PAD or EOS token."
+            "Training tokenizer requires "
+            "a PAD or EOS token."
         )
 
-    model = module.BidirectionalDiffusionTransformer(
-        cfg.MODEL_NAME,
-        len(tokenizer),
+    model = (
+        module.BidirectionalDiffusionTransformer(
+            cfg.MODEL_NAME,
+            len(tokenizer),
+        )
     )
 
     saved = torch.load(
@@ -816,7 +993,10 @@ def main():
         mmap=True,
     )
 
-    if not isinstance(saved, dict) or "model_state_dict" not in saved:
+    if (
+        not isinstance(saved, dict)
+        or "model_state_dict" not in saved
+    ):
         raise ValueError(
             "Expected a training checkpoint "
             "containing model_state_dict."
@@ -828,16 +1008,24 @@ def main():
     )
 
     print(
-        f"Checkpoint metadata: epoch={saved.get('epoch', 'unknown')}; "
-        f"training loss={saved.get('loss', 'unknown')}"
+        f"Checkpoint metadata: "
+        f"epoch={saved.get('epoch', 'unknown')}; "
+        f"training loss="
+        f"{saved.get('loss', 'unknown')}"
     )
 
     del saved
     gc.collect()
 
-    model.to(device=device, dtype=dtype).eval()
+    model.to(
+        device=device,
+        dtype=dtype,
+    ).eval()
 
-    print("Sampler: random position selection, then token sampling.")
+    print(
+        "Sampler: random position selection, "
+        "then token sampling."
+    )
 
     if args.reconstruction_check:
         reconstruction_check(
@@ -851,12 +1039,9 @@ def main():
 
     print(f"Results append to: {output}")
     print(
-        "Enter one prompt. One result will be appended, "
+        "Enter one prompt. "
+        "One result will be appended, "
         "then the program will exit."
-    )
-    print(
-        "The first generation may be slower "
-        "due to runtime initialization."
     )
 
     try:
@@ -866,17 +1051,22 @@ def main():
             else input("\nPrompt: ")
         )
     except (EOFError, KeyboardInterrupt):
-        print("\nCancelled; no result appended.")
+        print(
+            "\nCancelled; no result appended."
+        )
         return
 
     if not prompt.strip():
-        parser.error("Prompt must not be empty.")
+        parser.error(
+            "Prompt must not be empty."
+        )
 
-    seed = args.seed
-    torch.manual_seed(seed)
+    torch.manual_seed(args.seed)
 
     if device.type == "cuda":
-        torch.cuda.manual_seed_all(seed)
+        torch.cuda.manual_seed_all(
+            args.seed
+        )
         torch.cuda.synchronize(device)
 
     start_time = time.perf_counter()
@@ -893,46 +1083,48 @@ def main():
     if device.type == "cuda":
         torch.cuda.synchronize(device)
 
-    elapsed = time.perf_counter() - start_time
+    elapsed = (
+        time.perf_counter()
+        - start_time
+    )
 
     for message in diagnostics:
         print(message)
 
-    if not any(character.isalnum() for character in lyrics):
+    if not any(
+        character.isalnum()
+        for character in lyrics
+    ):
         print(
-            "WARNING: output contains no letters or digits. "
-            "This is a failed generation; it will still be logged."
+            "WARNING: output contains no "
+            "letters or digits. This failed "
+            "generation will still be logged."
         )
 
-    row = dict(zip(FIELDS, [
-        datetime.now(timezone.utc).isoformat(),
-        prompt,
-        lyrics,
-        f"{elapsed:.6f}",
-        str(checkpoint),
-        args.lyric_tokens,
-        steps,
-        args.temperature,
-        args.top_k,
-        seed,
-        str(device),
-        str(dtype),
-        True,
-    ]))
+    row = {
+        "Prompt": prompt,
+        "Generated Lyrics": lyrics,
+        "Time taken": f"{elapsed:.6f}",
+        "Base Model": False,
+    }
 
     try:
         append_result(output, row)
     except (OSError, ValueError):
         print(
-            f"\nCSV save failed. Generated lyrics:\n{lyrics}"
-            f"\nSeconds: {elapsed:.6f}"
+            f"\nCSV save failed. "
+            f"Generated lyrics:\n{lyrics}\n"
+            f"Seconds: {elapsed:.6f}"
         )
         raise
 
     print(
-        f"\n{lyrics}\n\nGeneration: {elapsed:.3f} seconds."
+        f"\n{lyrics}\n\n"
+        f"Generation: {elapsed:.3f} seconds."
     )
-    print(f"Appended one result to {output}")
+    print(
+        f"Appended one result to {output}"
+    )
 
 
 if __name__ == "__main__":
