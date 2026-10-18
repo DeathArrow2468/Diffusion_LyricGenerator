@@ -746,8 +746,8 @@ def main():
     parser.add_argument(
         "--checkpoint",
         default=(
-            "training_4/checkpoints_2_7_1e-4/"
-            "diffusion_epoch_7.pt"
+            "training_4/checkpoints_2_69_5e-5/"
+            "best_model.pt"
         ),
     )
     parser.add_argument(
