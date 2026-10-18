@@ -4,6 +4,10 @@ import os
 import random
 import sys
 
+import matplotlib  # [ADDED]
+matplotlib.use("Agg")  # [ADDED] saves to file without needing a display
+import matplotlib.pyplot as plt  # [ADDED]
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -75,6 +79,46 @@ def create_optimizer(model):
         ],
         lr=config.LEARNING_RATE,
     )
+
+
+def save_training_curves(  # [ADDED]
+    step_losses,
+    step_accuracies,
+    epoch_losses,
+    epoch_accuracies,
+    steps_per_epoch,
+    save_dir,
+):
+    """Plots loss and masked-token accuracy over the full training run."""
+
+    steps = list(range(1, len(step_losses) + 1))
+    epoch_x = [steps_per_epoch * (i + 1) for i in range(len(epoch_losses))]
+
+    fig, (ax_loss, ax_acc) = plt.subplots(1, 2, figsize=(14, 5))
+
+    ax_loss.plot(steps, step_losses, alpha=0.3, label="Per-step loss")
+    ax_loss.plot(epoch_x, epoch_losses, marker="o", label="Epoch average")
+    ax_loss.set_title("Training Loss")
+    ax_loss.set_xlabel("Training step")
+    ax_loss.set_ylabel("Loss")
+    ax_loss.legend()
+    ax_loss.grid(True, alpha=0.3)
+
+    ax_acc.plot(steps, step_accuracies, alpha=0.3, label="Per-step accuracy")
+    ax_acc.plot(epoch_x, epoch_accuracies, marker="o", label="Epoch average")
+    ax_acc.set_title("Masked-Token Accuracy")
+    ax_acc.set_xlabel("Training step")
+    ax_acc.set_ylabel("Accuracy")
+    ax_acc.legend()
+    ax_acc.grid(True, alpha=0.3)
+
+    fig.tight_layout()
+
+    graph_path = os.path.join(save_dir, "training_curves.png")
+    fig.savefig(graph_path, dpi=150)
+    plt.close(fig)
+
+    print(f"Training graph saved to {graph_path}")
 
 
 def train():
@@ -192,6 +236,11 @@ def train():
     # This is temporary: once we add a validation split, use validation loss instead.
     best_loss = float("inf")
 
+    step_losses = []  # [ADDED]
+    step_accuracies = []  # [ADDED]
+    epoch_losses = []  # [ADDED]
+    epoch_accuracies = []  # [ADDED]
+
     # ==========================================
     # 3. THE CORE TRAINING LOOP
     # ==========================================
@@ -199,6 +248,8 @@ def train():
         model.train()  # Put the model in training mode (enables dropout, etc.)
 
         total_loss = 0.0
+        epoch_correct = 0  # [ADDED]
+        epoch_masked = 0  # [ADDED]
         optimizer.zero_grad(set_to_none=True)
 
         # Create a terminal progress bar
@@ -280,6 +331,20 @@ def train():
 
                 unscaled_loss = example_losses.mean()
 
+            with torch.no_grad():  # [ADDED]
+                masked_positions = labels != -100  # [ADDED]
+                correct = (  # [ADDED]
+                    (logits.argmax(dim=-1) == labels) & masked_positions  # [ADDED]
+                ).sum().item()  # [ADDED]
+                masked_count = masked_positions.sum().item()  # [ADDED]
+
+            epoch_correct += correct  # [ADDED]
+            epoch_masked += masked_count  # [ADDED]
+            step_losses.append(unscaled_loss.item())  # [ADDED]
+            step_accuracies.append(  # [ADDED]
+                correct / masked_count if masked_count > 0 else float("nan")  # [ADDED]
+            )  # [ADDED]
+
             if not torch.isfinite(unscaled_loss):
                 raise RuntimeError(
                     f"Loss became invalid at epoch {epoch + 1}, "
@@ -338,6 +403,9 @@ def train():
         # ==========================================
         avg_loss = total_loss / len(dataloader)
 
+        epoch_losses.append(avg_loss)  # [ADDED]
+        epoch_accuracies.append(epoch_correct / max(epoch_masked, 1))  # [ADDED]
+
         print(
             f"Epoch {epoch + 1} completed. "
             f"Average Loss: {avg_loss:.4f}"
@@ -380,6 +448,15 @@ def train():
                 f"Loss did not improve from {best_loss:.4f}. "
                 "Skipping checkpoint.\n"
             )
+
+    save_training_curves(  # [ADDED]
+        step_losses,  # [ADDED]
+        step_accuracies,  # [ADDED]
+        epoch_losses,  # [ADDED]
+        epoch_accuracies,  # [ADDED]
+        len(dataloader),  # [ADDED]
+        config.CHECKPOINT_DIR,  # [ADDED]
+    )  # [ADDED]
 
 
 if __name__ == "__main__":
