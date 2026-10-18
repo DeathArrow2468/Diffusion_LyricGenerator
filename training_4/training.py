@@ -4,9 +4,9 @@ import os
 import random
 import sys
 
-import matplotlib  # [ADDED]
-matplotlib.use("Agg")  # [ADDED] saves to file without needing a display
-import matplotlib.pyplot as plt  # [ADDED]
+import matplotlib  
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  
 
 import numpy as np
 import torch
@@ -81,7 +81,7 @@ def create_optimizer(model):
     )
 
 
-def save_training_curves(  # [ADDED]
+def save_training_curves(  
     step_losses,
     step_accuracies,
     epoch_losses,
@@ -236,10 +236,10 @@ def train():
     # This is temporary: once we add a validation split, use validation loss instead.
     best_loss = float("inf")
 
-    step_losses = []  # [ADDED]
-    step_accuracies = []  # [ADDED]
-    epoch_losses = []  # [ADDED]
-    epoch_accuracies = []  # [ADDED]
+    step_losses = []  
+    step_accuracies = []  
+    epoch_losses = []  
+    epoch_accuracies = []  
 
     # ==========================================
     # 3. THE CORE TRAINING LOOP
@@ -248,8 +248,8 @@ def train():
         model.train()  # Put the model in training mode (enables dropout, etc.)
 
         total_loss = 0.0
-        epoch_correct = 0  # [ADDED]
-        epoch_masked = 0  # [ADDED]
+        epoch_correct = 0  
+        epoch_masked = 0  
         optimizer.zero_grad(set_to_none=True)
 
         # Create a terminal progress bar
@@ -296,7 +296,7 @@ def train():
             # BF16 is used only for suitable GPU calculations, which saves VRAM and speeds training.
             with torch.autocast(
                 device_type="cuda",
-                dtype=torch.bfloat16,
+                dtype=torch.float32,
                 enabled=True,
             ):
                 # 1. Forward Pass: Push the noisy sequence through the bidirectional architecture
@@ -331,19 +331,19 @@ def train():
 
                 unscaled_loss = example_losses.mean()
 
-            with torch.no_grad():  # [ADDED]
-                masked_positions = labels != -100  # [ADDED]
-                correct = (  # [ADDED]
-                    (logits.argmax(dim=-1) == labels) & masked_positions  # [ADDED]
-                ).sum().item()  # [ADDED]
-                masked_count = masked_positions.sum().item()  # [ADDED]
+            with torch.no_grad():  
+                masked_positions = labels != -100  
+                correct = (  
+                    (logits.argmax(dim=-1) == labels) & masked_positions  
+                ).sum().item()  
+                masked_count = masked_positions.sum().item()  
 
-            epoch_correct += correct  # [ADDED]
-            epoch_masked += masked_count  # [ADDED]
-            step_losses.append(unscaled_loss.item())  # [ADDED]
-            step_accuracies.append(  # [ADDED]
-                correct / masked_count if masked_count > 0 else float("nan")  # [ADDED]
-            )  # [ADDED]
+            epoch_correct += correct  
+            epoch_masked += masked_count  
+            step_losses.append(unscaled_loss.item())  
+            step_accuracies.append(  
+                correct / masked_count if masked_count > 0 else float("nan")  
+            )  
 
             if not torch.isfinite(unscaled_loss):
                 raise RuntimeError(
@@ -403,8 +403,8 @@ def train():
         # ==========================================
         avg_loss = total_loss / len(dataloader)
 
-        epoch_losses.append(avg_loss)  # [ADDED]
-        epoch_accuracies.append(epoch_correct / max(epoch_masked, 1))  # [ADDED]
+        epoch_losses.append(avg_loss)  
+        epoch_accuracies.append(epoch_correct / max(epoch_masked, 1))  
 
         print(
             f"Epoch {epoch + 1} completed. "
@@ -449,14 +449,14 @@ def train():
                 "Skipping checkpoint.\n"
             )
 
-    save_training_curves(  # [ADDED]
-        step_losses,  # [ADDED]
-        step_accuracies,  # [ADDED]
-        epoch_losses,  # [ADDED]
-        epoch_accuracies,  # [ADDED]
-        len(dataloader),  # [ADDED]
-        config.CHECKPOINT_DIR,  # [ADDED]
-    )  # [ADDED]
+    save_training_curves(  
+        step_losses,  
+        step_accuracies,  
+        epoch_losses,  
+        epoch_accuracies,  
+        len(dataloader),  
+        config.CHECKPOINT_DIR,  
+    )  
 
 
 if __name__ == "__main__":

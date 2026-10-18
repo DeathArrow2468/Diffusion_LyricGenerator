@@ -111,6 +111,7 @@ class BidirectionalDiffusionTransformer(nn.Module):
         # If we just pass the 2D mask, the C++ backend will silently apply a causal triangle.
         # We must explicitly construct the 4D matrix [Batch, Heads, Seq_Len, Seq_Len]
         # and penalize padding tokens so the softmax ignores them.
+
         batch_size, seq_length = input_ids.shape
 
         # Expand [Batch, Seq_Len] -> [Batch, 1, 1, Seq_Len]
@@ -198,7 +199,7 @@ if __name__ == "__main__":
     # and 4D mask integrate correctly.
     with torch.autocast(
         device_type="cuda",
-        dtype=torch.bfloat16,
+        dtype=torch.float32,
         enabled=torch.cuda.is_available(),
     ):
         logits = model(
