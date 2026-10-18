@@ -4,7 +4,7 @@
 # Update these folder names if your local directories are named differently 
 # (e.g., masking_tokenization_2 or diffusion_model_3)
 DATASET_PATH = r"C:\Users\Faiz\Desktop\Diffusion_LyricGenerator\Dataset_maker_1\train_data.jsonl"
-MODEL_NAME = "openai-community/gpt2-xl"
+MODEL_NAME = "Qwen/Qwen2.5-1.5B"
 MAX_SEQ_LEN = 256
 
 # Hardware Optimization for 8GB VRAM
