@@ -5,7 +5,9 @@ import requests
 import uuid
 import time
 import config
-
+###################################################################################################################################
+##################change encoding to allow or ensure quotations, etc to exst rather than \u- type of text i.e universal encoding########################## 
+###################################################################################################################################
 TIMEOUT = 60 #seconds
 
 def call_ollama(song_name, artist, description):
