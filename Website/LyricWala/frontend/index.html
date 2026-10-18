@@ -1,0 +1,2916 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#121212" />
+    <meta
+      name="description"
+      content="LyricWala — a little feeling, a whole song. Your quiet space to turn ideas into lyrics."
+    />
+    <title>LyricWala — Your next song starts here</title>
+    <style>
+      :root {
+        --green: #1ed760;
+        --ink: #121212;
+        --bg: #f5f6f3;
+        --surface: #fff;
+        --soft: #f7f8f6;
+        --text: #171b18;
+        --muted: #686f68;
+        --border: #e8ebe5;
+        --active: #eaf9ef;
+        --accent-text: #168139;
+        --shadow: 0 8px 35px #142c1610;
+        --record-shadow: 0 25px 40px #12121226;
+        color-scheme: light;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+      }
+      [data-theme="dark"] {
+        --bg: #121212;
+        --surface: #1b1d1b;
+        --soft: #222522;
+        --text: #f3f6f0;
+        --muted: #9ba298;
+        --border: #303630;
+        --active: #1a3423;
+        --accent-text: #1ed760;
+        --shadow: 0 8px 35px #0002;
+        --record-shadow: 0 25px 40px #0005;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        transition:
+          background 0.25s,
+          color 0.25s;
+      }
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      button,
+      select,
+      a {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button {
+        color: inherit;
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      select:focus-visible,
+      textarea:focus-visible,
+      input:focus-visible {
+        outline: 3px solid var(--green);
+        outline-offset: 4px;
+      }
+      button {
+        transition:
+          background 0.18s,
+          transform 0.18s,
+          box-shadow 0.18s;
+      }
+      button:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+      svg {
+        display: block;
+        flex-shrink: 0;
+      }
+      button svg {
+        pointer-events: none;
+      }
+      .icon {
+        width: 19px;
+        height: 19px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.65;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 218px minmax(0, 1fr);
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        padding: 34px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--text);
+        text-decoration: none;
+        font-size: 24px;
+        font-weight: 750;
+        letter-spacing: -1.3px;
+      }
+      .brand-mark {
+        width: 34px;
+        height: 38px;
+        background: var(--green);
+        border-radius: 11px;
+        display: grid;
+        place-items: center;
+        color: #121212;
+        transform: rotate(-5deg);
+      }
+      .brand-mark .icon {
+        width: 23px;
+        height: 23px;
+        stroke-width: 2.7;
+      }
+      .brand-sub {
+        margin: 11px 0 43px 45px;
+        font-size: 9px;
+        letter-spacing: 2px;
+        font-weight: 650;
+        color: var(--muted);
+      }
+      .nav-label {
+        font-size: 9px;
+        letter-spacing: 1.8px;
+        color: var(--muted);
+        font-weight: 700;
+        margin: 0 12px 14px;
+      }
+      .nav {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .nav button {
+        border: 0;
+        background: transparent;
+        padding: 13px 14px;
+        border-radius: 13px;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-size: 13px;
+        font-weight: 550;
+        color: var(--muted);
+      }
+      .nav button:hover {
+        background: var(--soft);
+        color: var(--text);
+      }
+      .nav button.active {
+        background: var(--active);
+        color: var(--accent-text);
+      }
+      .count {
+        margin-left: auto;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        min-width: 21px;
+        padding: 2px 5px;
+        text-align: center;
+        font-size: 10px;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+      }
+      .tiny-note {
+        padding: 20px 12px 27px;
+        line-height: 1.7;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .tiny-note .icon {
+        color: var(--accent-text);
+        margin-bottom: 15px;
+        width: 25px;
+        height: 25px;
+      }
+      .tiny-note strong {
+        font-weight: 500;
+        color: var(--text);
+      }
+      .sidebar-foot {
+        border-top: 1px solid var(--border);
+        padding: 21px 9px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .live-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: var(--green);
+        border-radius: 50%;
+        margin-right: 6px;
+        box-shadow: 0 0 0 3px #1ed76012;
+      }
+      .main {
+        width: 100%;
+        max-width: 1500px;
+        margin: auto;
+        padding: 26px 42px 24px;
+        align-self: start;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 36px;
+      }
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .breadcrumb .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .breadcrumb span:last-child {
+        color: var(--text);
+      }
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .mode-badge {
+        display: flex;
+        align-items: center;
+        font-size: 10px;
+        letter-spacing: 0.2px;
+        color: var(--muted);
+      }
+      .theme-switch {
+        padding: 4px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 100px;
+        display: flex;
+        gap: 2px;
+      }
+      .theme-switch button {
+        border: 0;
+        background: transparent;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+      }
+      .theme-switch button[aria-pressed="true"] {
+        background: var(--text);
+        color: var(--surface);
+      }
+      .theme-switch .icon {
+        width: 14px;
+        height: 14px;
+      }
+      .avatar {
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: 50%;
+        width: 34px;
+        height: 34px;
+        font-family: Georgia, serif;
+        font-style: italic;
+        font-size: 18px;
+      }
+      .hero {
+        padding: 39px 0 31px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 24px;
+      }
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 9px;
+        font-weight: 650;
+        letter-spacing: 2px;
+        color: var(--muted);
+        margin: 0 0 15px;
+      }
+      .eyebrow .line {
+        width: 20px;
+        height: 2px;
+        background: var(--green);
+      }
+      h1 {
+        font-size: 48px;
+        line-height: 1.13;
+        letter-spacing: -2.2px;
+        font-weight: 650;
+        margin: 0;
+      }
+      .serif {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 400;
+        font-style: italic;
+        letter-spacing: -2px;
+      }
+      .hero p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.8;
+        margin: 14px 0 0;
+      }
+      .hero-side {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.65;
+        padding-bottom: 4px;
+        white-space: nowrap;
+      }
+      .mini-wave {
+        height: 26px;
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      }
+      .mini-wave i {
+        width: 3px;
+        border-radius: 3px;
+        background: var(--green);
+        height: var(--h);
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(340px, 1.04fr) minmax(330px, 1fr);
+        gap: 22px;
+        align-items: stretch;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 23px;
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+      .composer {
+        padding: 25px 26px;
+      }
+      .card-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 22px;
+      }
+      .card-title h2 {
+        font-size: 15px;
+        letter-spacing: -0.35px;
+        font-weight: 650;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .card-title h2 .icon {
+        width: 17px;
+        height: 17px;
+      }
+      .step-tag {
+        font-size: 9px;
+        color: var(--muted);
+        letter-spacing: 1.3px;
+      }
+      .field-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 10px;
+        gap: 10px;
+      }
+      .optional {
+        font-size: 9px;
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .prompt-wrap {
+        position: relative;
+        border: 1px solid var(--border);
+        border-radius: 13px;
+        background: var(--soft);
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      .prompt-wrap:focus-within {
+        border-color: var(--green);
+        box-shadow: 0 0 0 3px #1ed7612;
+      }
+      .prompt-wrap textarea {
+        width: 100%;
+        height: 121px;
+        border: 0;
+        resize: vertical;
+        min-height: 100px;
+        max-height: 220px;
+        display: block;
+        background: transparent;
+        padding: 16px 16px 5px;
+        color: var(--text);
+        font-size: 12px;
+        line-height: 1.8;
+        outline: none;
+      }
+      .prompt-wrap textarea:focus-visible {
+        outline: none;
+      }
+      .prompt-wrap textarea::placeholder {
+        color: var(--muted);
+        opacity: 0.8;
+      }
+      .prompt-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 13px 11px;
+        color: var(--muted);
+        font-size: 9px;
+      }
+      .text-button {
+        border: 0;
+        background: transparent;
+        padding: 4px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 10px;
+      }
+      .text-button:hover {
+        color: var(--accent-text);
+      }
+      .text-button .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .two-fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin: 23px 0;
+      }
+      .select-wrap {
+        position: relative;
+      }
+      .select-wrap .icon {
+        position: absolute;
+        right: 13px;
+        top: 14px;
+        width: 13px;
+        height: 13px;
+        pointer-events: none;
+        color: var(--muted);
+      }
+      select {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 12px 30px 12px 13px;
+        font-size: 11px;
+        appearance: none;
+        cursor: pointer;
+      }
+      .mood-list {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        margin: 0 0 24px;
+      }
+      .chip {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 10px;
+        border-radius: 100px;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .chip:hover {
+        transform: translateY(-2px);
+        border-color: var(--green);
+        color: var(--text);
+      }
+      .chip[aria-pressed="true"] {
+        background: var(--active);
+        border-color: #1ed76050;
+        color: var(--accent-text);
+      }
+      .chip .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .creativity-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .range-value {
+        font-size: 9px;
+        font-weight: 500;
+        padding: 4px 8px;
+        background: var(--soft);
+        border-radius: 6px;
+        color: var(--muted);
+      }
+      input[type="range"] {
+        width: 100%;
+        height: 4px;
+        appearance: none;
+        border-radius: 4px;
+        margin: 19px 0 10px;
+        cursor: pointer;
+        background: linear-gradient(
+          to right,
+          var(--green) 50%,
+          var(--border) 50%
+        );
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        appearance: none;
+        background: var(--surface);
+        border: 4px solid var(--green);
+        border-radius: 50%;
+        height: 16px;
+        width: 16px;
+        box-shadow: 0 2px 7px #0002;
+      }
+      input[type="range"]::-moz-range-thumb {
+        background: var(--surface);
+        border: 4px solid var(--green);
+        border-radius: 50%;
+        height: 9px;
+        width: 9px;
+      }
+      .range-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .generate-button {
+        border: 0;
+        background: var(--green);
+        color: #121212;
+        border-radius: 11px;
+        padding: 14px 18px;
+        width: 100%;
+        margin-top: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        font-weight: 700;
+        font-size: 12px;
+        box-shadow: 0 4px 10px #1ed76012;
+      }
+      .generate-button:hover:not(:disabled) {
+        background: #34e272;
+        box-shadow: 0 6px 20px #1ed76038;
+        transform: translateY(-2px);
+      }
+      .generate-button .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .shortcut {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        margin: 12px 0 0;
+        font-size: 9px;
+        color: var(--muted);
+      }
+      kbd {
+        font: inherit;
+        border: 1px solid var(--border);
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      .error {
+        margin: 12px 0 0;
+        padding: 11px 13px;
+        background: var(--soft);
+        border-left: 3px solid var(--text);
+        border-radius: 5px;
+        font-size: 11px;
+        line-height: 1.7;
+      }
+      .error button {
+        display: inline;
+        border: 0;
+        background: none;
+        text-decoration: underline;
+        font-size: inherit;
+        padding: 0 4px;
+      }
+      .output {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .output-head {
+        padding: 25px 25px 19px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+      }
+      .output-label {
+        font-size: 11px;
+        font-weight: 550;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .output-label .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .sheet-status {
+        font-size: 8px;
+        letter-spacing: 1.4px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .sheet-status i {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--border);
+      }
+      .output-actions {
+        display: flex;
+        gap: 4px;
+      }
+      .icon-button {
+        width: 29px;
+        height: 29px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: var(--muted);
+        display: grid;
+        place-items: center;
+      }
+      .icon-button:hover {
+        background: var(--soft);
+        color: var(--text);
+      }
+      .icon-button .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 30px 23px 24px;
+        min-height: 444px;
+        background: radial-gradient(
+          ellipse at 50% 36%,
+          #1ed76008,
+          transparent 62%
+        );
+      }
+      .record-zone {
+        position: relative;
+        width: 244px;
+        height: 220px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 25px;
+        perspective: 800px;
+      }
+      .record-wrap {
+        position: relative;
+        transition: transform 0.2s ease-out;
+        transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+        will-change: transform;
+      }
+      .record-button {
+        position: relative;
+        width: 198px;
+        height: 198px;
+        border: 0;
+        padding: 0;
+        border-radius: 50%;
+        background: #151715;
+        box-shadow: var(--record-shadow);
+        display: grid;
+        place-items: center;
+        color: #121212;
+      }
+      .record-button:active {
+        transform: none !important;
+      }
+      .record-disc {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        position: relative;
+        background: repeating-radial-gradient(
+            circle at center,
+            transparent 0px,
+            transparent 2px,
+            #ffffff0b 2.5px,
+            #ffffff0b 3px,
+            transparent 3.5px,
+            transparent 5px
+          ),
+          conic-gradient(
+            from 30deg,
+            #101210,
+            #303530 45deg,
+            #101210 80deg,
+            #101210 180deg,
+            #303530 220deg,
+            #101210 270deg
+          );
+        animation: spin 16s linear infinite;
+        animation-play-state: paused;
+      }
+      .record-disc.spinning,
+      .is-generating .record-disc {
+        animation-play-state: running;
+      }
+      .record-label {
+        width: 76px;
+        height: 76px;
+        border-radius: 50%;
+        background: var(--green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 5px;
+        box-shadow:
+          0 0 0 5px #151715,
+          0 0 0 6px #ffffff17;
+        font-size: 7px;
+        letter-spacing: 2px;
+        font-weight: 700;
+      }
+      .record-label strong {
+        font-size: 11px;
+        letter-spacing: -0.4px;
+      }
+      .record-hole {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #121212;
+        border: 2px solid #ffffff50;
+      }
+      .orbit-label {
+        position: absolute;
+        bottom: 4px;
+        right: -5px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        padding: 8px 11px;
+        border-radius: 100px;
+        font-size: 8px;
+        color: var(--muted);
+        box-shadow: 0 4px 10px #00000008;
+        transform: rotate(-7deg);
+      }
+      .orbit-label .icon {
+        width: 11px;
+        height: 11px;
+        color: var(--accent-text);
+      }
+      .floating-spark {
+        position: absolute;
+        color: var(--accent-text);
+        right: 0;
+        top: 12px;
+        transform: rotate(12deg);
+      }
+      .floating-spark .icon {
+        width: 24px;
+        height: 24px;
+      }
+      .record-zone:before {
+        content: "";
+        position: absolute;
+        left: 5px;
+        top: 15px;
+        width: 5px;
+        height: 5px;
+        background: var(--green);
+        border-radius: 50%;
+      }
+      .empty-state h3 {
+        font-size: 24px;
+        letter-spacing: -0.9px;
+        font-weight: 550;
+        line-height: 1.3;
+        margin: 0 0 11px;
+      }
+      .empty-state h3 em {
+        font-family: Georgia, serif;
+        font-weight: 400;
+      }
+      .empty-state p {
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--muted);
+        max-width: 250px;
+        margin: 0;
+      }
+      .output-foot {
+        padding: 15px 25px;
+        border-top: 1px solid var(--border);
+        font-size: 9px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .output-foot .icon {
+        width: 12px;
+        height: 12px;
+      }
+      .output-foot span {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+      .loading-panel {
+        width: 100%;
+        max-width: 300px;
+        margin-top: 24px;
+      }
+      .progress-caption {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--muted);
+        margin-bottom: 9px;
+        font-variant-numeric: tabular-nums;
+      }
+      .progress-track {
+        height: 5px;
+        border-radius: 5px;
+        background: var(--border);
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 5px;
+        background: var(--green);
+        transition: width 0.45s ease;
+        position: relative;
+      }
+      .progress-fill:after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, #ffffff80, transparent);
+        animation: shimmer 1.8s infinite;
+      }
+      .progress-track.indeterminate .progress-fill {
+        width: 30% !important;
+        animation: indeterminate 1.5s ease-in-out infinite;
+      }
+      .cancel-button {
+        margin: 15px auto 0;
+        font-size: 10px;
+        display: block;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .lyrics-state {
+        padding: 28px 29px 22px;
+        flex: 1;
+        animation: appear 0.45s ease;
+        min-height: 444px;
+      }
+      .lyric-kicker {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        color: var(--accent-text);
+        font-size: 9px;
+        letter-spacing: 1.4px;
+      }
+      .lyric-title {
+        font-size: 28px;
+        letter-spacing: -1px;
+        margin: 0 0 7px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .lyric-meta {
+        color: var(--muted);
+        font-size: 10px;
+        display: flex;
+        gap: 7px;
+        margin-bottom: 20px;
+      }
+      .lyric-body {
+        font-family: Georgia, "Times New Roman", serif;
+        line-height: 1.9;
+        font-size: 15px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 282px;
+        overflow: auto;
+        padding-right: 10px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+      }
+      .lyric-body h4 {
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        font-size: 8px;
+        letter-spacing: 1.7px;
+        font-weight: 600;
+        color: var(--muted);
+        margin: 18px 0 7px;
+      }
+      .lyric-body h4:first-child {
+        margin-top: 0;
+      }
+      .lyric-body p {
+        margin: 0;
+      }
+      .sample-notice {
+        font-size: 9px;
+        color: var(--muted);
+        line-height: 1.7;
+        background: var(--soft);
+        padding: 10px 12px;
+        border-radius: 8px;
+        margin-top: 18px;
+      }
+      .lyrics-bottom {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 18px;
+        gap: 12px;
+      }
+      .save-button {
+        background: var(--text);
+        color: var(--surface);
+        border: 0;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        border-radius: 8px;
+        font-size: 10px;
+        padding: 10px 13px;
+      }
+      .save-button .icon {
+        width: 13px;
+        height: 13px;
+      }
+      .save-button.saved {
+        background: var(--active);
+        color: var(--accent-text);
+      }
+      .inspiration {
+        margin-top: 29px;
+      }
+      .section-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 0 0 12px;
+      }
+      .section-heading h2 {
+        font-size: 11px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .section-heading span {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .inspiration-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .inspiration-card {
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 13px;
+        padding: 15px 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-align: left;
+      }
+      .inspiration-card:hover {
+        background: var(--surface);
+        transform: translateY(-3px);
+        box-shadow: var(--shadow);
+        border-color: #1ed76060;
+      }
+      .prompt-icon {
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--accent-text);
+      }
+      .prompt-icon .icon {
+        width: 16px;
+        height: 16px;
+      }
+      .prompt-copy {
+        min-width: 0;
+      }
+      .prompt-copy strong {
+        display: block;
+        font-size: 10px;
+        font-weight: 600;
+        margin-bottom: 5px;
+      }
+      .prompt-copy span {
+        display: block;
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .inspiration-card > .icon {
+        width: 13px;
+        height: 13px;
+        margin-left: auto;
+        color: var(--muted);
+      }
+      .footer {
+        margin-top: 25px;
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 8px;
+        letter-spacing: 0.1px;
+      }
+      .footer .heart {
+        color: var(--accent-text);
+      }
+      .library-view {
+        padding-top: 42px;
+      }
+      .library-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .library-top h1 {
+        font-size: 36px;
+      }
+      .library-top p {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 0;
+      }
+      .library-search {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        padding: 11px 14px;
+        max-width: 220px;
+        color: var(--text);
+        font-size: 12px;
+      }
+      .saved-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .saved-card {
+        padding: 24px;
+        position: relative;
+      }
+      .saved-card h2 {
+        font-size: 21px;
+        font-weight: 550;
+        letter-spacing: -0.7px;
+        margin: 12px 0;
+      }
+      .saved-card p {
+        white-space: pre-line;
+        font-family: Georgia, serif;
+        font-size: 13px;
+        line-height: 1.8;
+        color: var(--muted);
+        max-height: 95px;
+        overflow: hidden;
+      }
+      .saved-card-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+        margin-top: 20px;
+      }
+      .saved-date {
+        font-size: 9px;
+        color: var(--muted);
+      }
+      .saved-empty {
+        text-align: center;
+        padding: 100px 24px;
+        color: var(--muted);
+      }
+      .saved-empty .icon {
+        margin: 0 auto 18px;
+        width: 32px;
+        height: 32px;
+        color: var(--accent-text);
+      }
+      .saved-empty h2 {
+        color: var(--text);
+        font-size: 22px;
+        font-weight: 550;
+      }
+      .saved-empty p {
+        font-size: 12px;
+        line-height: 1.8;
+      }
+      .saved-empty button {
+        max-width: 170px;
+        margin: 24px auto 0;
+      }
+      .toast {
+        position: fixed;
+        bottom: 28px;
+        left: calc(50% + 109px);
+        transform: translate(-50%, 15px);
+        padding: 13px 20px;
+        border-radius: 100px;
+        background: var(--text);
+        color: var(--surface);
+        box-shadow: var(--shadow);
+        font-size: 12px;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.2s,
+          transform 0.2s;
+        z-index: 10;
+        max-width: 90vw;
+        text-align: center;
+      }
+      .toast.visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      dialog {
+        max-width: 450px;
+        width: calc(100% - 36px);
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 30px;
+        box-shadow: var(--shadow);
+      }
+      dialog::backdrop {
+        background: #12121270;
+        backdrop-filter: blur(6px);
+      }
+      dialog h2 {
+        font-size: 25px;
+        letter-spacing: -0.9px;
+        margin: 14px 0;
+      }
+      dialog p {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.9;
+      }
+      dialog .close-dialog {
+        float: right;
+      }
+      dialog .dialog-step {
+        display: flex;
+        gap: 13px;
+        align-items: flex-start;
+        margin: 18px 0;
+      }
+      dialog .number {
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        width: 25px;
+        height: 25px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        color: var(--accent-text);
+        font-size: 10px;
+      }
+      dialog .dialog-step p {
+        margin: 0;
+      }
+      dialog strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .brand-inline {
+        color: var(--accent-text);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes shimmer {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(100%);
+        }
+      }
+      @keyframes indeterminate {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(450%);
+        }
+      }
+      @keyframes appear {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @media (min-width: 1600px) {
+        .main {
+          padding: 32px 65px;
+        }
+        .hero {
+          padding-top: 55px;
+          padding-bottom: 40px;
+        }
+        h1 {
+          font-size: 58px;
+        }
+        .composer {
+          padding: 30px;
+        }
+        .workspace {
+          gap: 28px;
+        }
+        .prompt-wrap textarea {
+          height: 145px;
+        }
+        .empty-state {
+          min-height: 490px;
+        }
+        .record-button {
+          width: 220px;
+          height: 220px;
+        }
+        .record-zone {
+          height: 240px;
+        }
+      }
+      @media (max-width: 1150px) {
+        .app {
+          grid-template-columns: 184px minmax(0, 1fr);
+        }
+        .sidebar {
+          padding: 30px 15px;
+        }
+        .brand {
+          font-size: 21px;
+        }
+        .brand-sub {
+          font-size: 8px;
+          margin-left: 42px;
+        }
+        .main {
+          padding: 24px;
+        }
+        .hero-side {
+          display: none;
+        }
+        .workspace {
+          gap: 16px;
+          grid-template-columns: minmax(300px, 1fr) minmax(290px, 1fr);
+        }
+        .composer {
+          padding: 23px 20px;
+        }
+        .inspiration-card {
+          padding: 13px 10px;
+          gap: 8px;
+        }
+        .prompt-icon {
+          width: 28px;
+          height: 28px;
+        }
+        .inspiration-card > .icon {
+          display: none;
+        }
+        .toast {
+          left: calc(50% + 92px);
+        }
+      }
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 76px minmax(0, 1fr);
+        }
+        .sidebar {
+          padding: 25px 14px;
+        }
+        .brand {
+          justify-content: center;
+        }
+        .brand > span:last-child,
+        .brand-sub,
+        .nav-label,
+        .nav-text,
+        .count,
+        .tiny-note,
+        .sidebar-foot {
+          display: none;
+        }
+        .nav {
+          margin-top: 43px;
+        }
+        .nav button {
+          padding: 13px;
+          justify-content: center;
+        }
+        .nav button .icon {
+          width: 20px;
+          height: 20px;
+        }
+        .main {
+          padding: 23px 22px;
+        }
+        .workspace {
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+        .composer {
+          padding: 22px 18px;
+        }
+        .hero {
+          padding-top: 30px;
+        }
+        .hero h1 {
+          font-size: 40px;
+        }
+        .chip {
+          padding: 7px 9px;
+        }
+        .record-zone {
+          width: 210px;
+        }
+        .record-button {
+          width: 174px;
+          height: 174px;
+        }
+        .record-label {
+          width: 65px;
+          height: 65px;
+        }
+        .empty-state h3 {
+          font-size: 22px;
+        }
+        .output-head {
+          padding: 22px 18px 19px;
+        }
+        .output-foot {
+          padding: 15px 18px;
+        }
+        .lyrics-state {
+          padding: 24px 20px;
+        }
+        .toast {
+          left: calc(50% + 38px);
+        }
+      }
+      @media (max-width: 720px) {
+        .app {
+          display: block;
+        }
+        .sidebar {
+          height: 68px;
+          width: 100%;
+          position: sticky;
+          flex-direction: row;
+          align-items: center;
+          padding: 0 20px;
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+          gap: 20px;
+        }
+        .brand > span:last-child {
+          display: block;
+          font-size: 21px;
+        }
+        .brand-mark {
+          width: 29px;
+          height: 32px;
+          border-radius: 9px;
+        }
+        .brand-mark .icon {
+          width: 20px;
+          height: 20px;
+        }
+        .nav {
+          margin: 0 0 0 auto;
+          flex-direction: row;
+          gap: 5px;
+        }
+        .nav button {
+          padding: 10px;
+        }
+        .sidebar-bottom {
+          display: none;
+        }
+        .main {
+          padding: 18px 20px 25px;
+        }
+        .topbar {
+          min-height: 30px;
+        }
+        .breadcrumb {
+          font-size: 10px;
+        }
+        .top-actions {
+          gap: 10px;
+        }
+        .avatar {
+          display: none;
+        }
+        .mode-badge {
+          font-size: 9px;
+        }
+        .hero {
+          padding: 28px 0;
+        }
+        .hero h1 {
+          font-size: 42px;
+        }
+        .hero p {
+          font-size: 12px;
+          max-width: 310px;
+        }
+        .hero p br {
+          display: none;
+        }
+        .workspace {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .composer {
+          padding: 24px;
+        }
+        .output {
+          min-height: 480px;
+        }
+        .empty-state {
+          min-height: 400px;
+        }
+        .record-zone {
+          width: 240px;
+          height: 200px;
+          margin-bottom: 22px;
+        }
+        .record-button {
+          width: 185px;
+          height: 185px;
+        }
+        .record-label {
+          width: 70px;
+          height: 70px;
+        }
+        .inspiration-grid {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .inspiration-card {
+          padding: 13px 15px;
+          gap: 12px;
+        }
+        .prompt-icon {
+          width: 32px;
+          height: 32px;
+        }
+        .inspiration-card > .icon {
+          display: block;
+        }
+        .inspiration-card .prompt-copy strong {
+          font-size: 11px;
+        }
+        .prompt-copy span {
+          font-size: 10px;
+        }
+        .footer {
+          font-size: 8px;
+          gap: 10px;
+        }
+        .toast {
+          left: 50%;
+          bottom: 20px;
+        }
+        .saved-grid {
+          grid-template-columns: 1fr;
+        }
+        .library-top {
+          align-items: flex-start;
+          gap: 20px;
+          flex-direction: column;
+        }
+        .library-search {
+          max-width: none;
+          width: 100%;
+        }
+        .library-view {
+          padding-top: 28px;
+        }
+        .lyric-body {
+          max-height: 400px;
+        }
+        .lyrics-state {
+          padding: 26px;
+        }
+        .section-heading span {
+          font-size: 8px;
+        }
+        .eyebrow {
+          font-size: 8px;
+        }
+        .sheet-status {
+          font-size: 8px;
+        }
+      }
+      @media (max-width: 420px) {
+        .sidebar {
+          padding: 0 14px;
+          gap: 12px;
+        }
+        .brand > span:last-child {
+          font-size: 19px;
+        }
+        .nav {
+          gap: 2px;
+        }
+        .nav button {
+          padding: 8px;
+        }
+        .main {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .mode-badge {
+          display: none;
+        }
+        .breadcrumb > span:not(:last-child) {
+          display: none;
+        }
+        .composer {
+          padding: 22px 20px;
+        }
+        .hero h1 {
+          font-size: 38px;
+        }
+        .output-foot {
+          flex-wrap: wrap;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *:before,
+        *:after {
+          animation: none !important;
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+        .record-wrap {
+          transform: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="0"
+      height="0"
+      style="position: absolute"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="i-wave" viewBox="0 0 24 24">
+          <path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4" />
+        </symbol>
+        <symbol id="i-pen" viewBox="0 0 24 24">
+          <path d="m16 3 5 5L9 20l-6 1 1-6L16 3Zm-2 2 5 5M4 15l5 5" />
+        </symbol>
+        <symbol id="i-stack" viewBox="0 0 24 24">
+          <path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" />
+        </symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24">
+          <path
+            d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3L12 3ZM20 2v4m-2-2h4"
+          />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M5 12h14m-5-5 5 5-5 5" />
+        </symbol>
+        <symbol id="i-down" viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path d="M20.5 13A9 9 0 0 1 11 3.5 9 9 0 1 0 20.5 13Z" />
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path
+            d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"
+          />
+        </symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24">
+          <path
+            d="M20.8 4.7a5.5 5.5 0 0 0-7.8 0L12 5.8l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.5a5.5 5.5 0 0 0 0-7.8Z"
+          />
+        </symbol>
+        <symbol id="i-cloud" viewBox="0 0 24 24">
+          <path
+            d="M6 17a4 4 0 0 1-1-7.8 6 6 0 0 1 11.7-1.1A4.5 4.5 0 1 1 18 17H6Zm2 3h0m4 1h0m4-1h0"
+          />
+        </symbol>
+        <symbol id="i-bolt" viewBox="0 0 24 24">
+          <path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z" />
+        </symbol>
+        <symbol id="i-book" viewBox="0 0 24 24">
+          <path d="M4 4h6l2 2 2-2h6v15h-6l-2 2-2-2H4V4Zm8 2v15" />
+        </symbol>
+        <symbol id="i-info" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 11v6m0-10h.01" />
+        </symbol>
+        <symbol id="i-shuffle" viewBox="0 0 24 24">
+          <path
+            d="M3 6h3l12 12h3m-4-4 4 4-4 4M3 18h3l4-4m4-4 4-4h3m-4-4 4 4-4 4"
+          />
+        </symbol>
+        <symbol id="i-file" viewBox="0 0 24 24">
+          <path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h6" />
+        </symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24">
+          <rect x="8" y="8" width="12" height="13" rx="2" />
+          <path d="M16 8V3H3v13h5" />
+        </symbol>
+        <symbol id="i-download" viewBox="0 0 24 24">
+          <path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5" />
+        </symbol>
+        <symbol id="i-save" viewBox="0 0 24 24">
+          <path d="M6 3h12v18l-6-4-6 4V3Z" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24">
+          <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
+        </symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24">
+          <path
+            d="M20 7v5h-5M4 17v-5h5m-4.5-5a8 8 0 0 1 13-3L20 7M4 17l2.5 3a8 8 0 0 0 13-3"
+          />
+        </symbol>
+      </defs>
+    </svg>
+    <div class="app">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="#studio" aria-label="LyricWala home"
+          ><span class="brand-mark"
+            ><svg class="icon"><use href="#i-wave" /></svg></span
+          ><span>LyricWala<span style="color: var(--green)">.</span></span></a
+        >
+        <div class="brand-sub">FIND YOUR WORDS</div>
+        <div class="nav-label">YOUR SPACE</div>
+        <nav class="nav">
+          <button
+            id="navStudio"
+            class="active"
+            aria-current="page"
+            title="Writing studio"
+          >
+            <svg class="icon"><use href="#i-pen" /></svg
+            ><span class="nav-text">Writing studio</span></button
+          ><button id="navSaved" title="Saved lyrics">
+            <svg class="icon"><use href="#i-stack" /></svg
+            ><span class="nav-text">Saved lyrics</span
+            ><span class="count" id="savedCount">0</span></button
+          ><button id="helpButton" title="How it works">
+            <svg class="icon"><use href="#i-info" /></svg
+            ><span class="nav-text">How it works</span>
+          </button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="tiny-note">
+            <svg class="icon"><use href="#i-spark" /></svg>A space for the
+            words<br />you haven't found.<br /><strong>Yet.</strong>
+          </div>
+          <div class="sidebar-foot">
+            <span><i class="live-dot"></i>Made for creating</span
+            ><span>v.01</span>
+          </div>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div class="breadcrumb">
+            <svg class="icon"><use href="#i-wave" /></svg
+            ><span>Your workspace</span><span>/</span
+            ><span id="breadcrumbCurrent">Writing studio</span>
+          </div>
+          <div class="top-actions">
+            <span class="mode-badge" id="modeBadge"
+              ><i class="live-dot"></i>Preview mode</span
+            >
+            <div class="theme-switch" aria-label="Color theme">
+              <button
+                id="lightTheme"
+                aria-label="Light theme"
+                aria-pressed="true"
+                title="Light theme"
+              >
+                <svg class="icon"><use href="#i-sun" /></svg></button
+              ><button
+                id="darkTheme"
+                aria-label="Dark theme"
+                aria-pressed="false"
+                title="Dark theme"
+              >
+                <svg class="icon"><use href="#i-moon" /></svg>
+              </button>
+            </div>
+            <div class="avatar" aria-hidden="true">lw</div>
+          </div>
+        </header>
+        <div id="studioView">
+          <section class="hero">
+            <div>
+              <div class="eyebrow">
+                <span class="line"></span>BIG FEELINGS. BLANK PAGES. NEW
+                BEGINNINGS.
+              </div>
+              <h1>
+                A little feeling.<br />A whole <span class="serif">song.</span>
+              </h1>
+              <p>
+                Turn what's on your mind into what's on the page.<br />Bring the
+                idea. Let's find the words.
+              </p>
+            </div>
+            <div class="hero-side">
+              <div class="mini-wave" aria-hidden="true">
+                <i style="--h: 9px"></i><i style="--h: 19px"></i
+                ><i style="--h: 26px"></i><i style="--h: 13px"></i
+                ><i style="--h: 22px"></i><i style="--h: 10px"></i>
+              </div>
+              <span>A fresh take.<br />Every time you create.</span>
+            </div>
+          </section>
+          <section class="workspace" aria-label="Lyric writing workspace">
+            <form id="composerForm" class="card composer">
+              <div class="card-title">
+                <h2>
+                  <svg class="icon"><use href="#i-pen" /></svg>What's your
+                  story?
+                </h2>
+                <span class="step-tag">THE STARTING POINT</span>
+              </div>
+              <label class="field-label" for="prompt"
+                >Give us a little inspiration<span class="optional"
+                  >A moment, a feeling, anything.</span
+                ></label
+              >
+              <div class="prompt-wrap">
+                <textarea
+                  id="prompt"
+                  maxlength="600"
+                  required
+                  placeholder="That late-night drive with the windows down. The city is asleep, but you've never felt more alive…"
+                  aria-describedby="promptHint"
+                ></textarea>
+                <div class="prompt-bottom">
+                  <button class="text-button" id="surpriseButton" type="button">
+                    <svg class="icon"><use href="#i-shuffle" /></svg>Surprise me</button
+                  ><span id="promptHint"
+                    ><span id="charCount">0</span> / 600</span
+                  >
+                </div>
+              </div>
+              <div class="two-fields">
+                <div>
+                  <label class="field-label" for="genre">Pick a sound</label>
+                  <div class="select-wrap">
+                    <select id="genre">
+                      <option>Indie pop</option>
+                      <option>Pop</option>
+                      <option>Hip-hop</option>
+                      <option>R&amp;B</option>
+                      <option>Rock</option>
+                      <option>Acoustic</option>
+                      <option>Country</option></select
+                    ><svg class="icon"><use href="#i-down" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label" for="length">Make room for</label>
+                  <div class="select-wrap">
+                    <select id="length">
+                      <option value="short">A little hook</option>
+                      <option value="standard" selected>
+                        A verse &amp; chorus
+                      </option>
+                      <option value="long">A longer draft</option></select
+                    ><svg class="icon"><use href="#i-down" /></svg>
+                  </div>
+                </div>
+              </div>
+              <div class="field-label" id="moodLabel">Set the feeling</div>
+              <div class="mood-list" role="group" aria-labelledby="moodLabel">
+                <button
+                  type="button"
+                  class="chip"
+                  data-mood="Dreamy"
+                  aria-pressed="true"
+                >
+                  <svg class="icon"><use href="#i-cloud" /></svg>Dreamy</button
+                ><button
+                  type="button"
+                  class="chip"
+                  data-mood="Melancholic"
+                  aria-pressed="false"
+                >
+                  <svg class="icon"><use href="#i-moon" /></svg
+                  >Melancholic</button
+                ><button
+                  type="button"
+                  class="chip"
+                  data-mood="Uplifting"
+                  aria-pressed="false"
+                >
+                  <svg class="icon"><use href="#i-sun" /></svg>Uplifting</button
+                ><button
+                  type="button"
+                  class="chip"
+                  data-mood="Romantic"
+                  aria-pressed="false"
+                >
+                  <svg class="icon"><use href="#i-heart" /></svg
+                  >Romantic</button
+                ><button
+                  type="button"
+                  class="chip"
+                  data-mood="Bold"
+                  aria-pressed="false"
+                >
+                  <svg class="icon"><use href="#i-bolt" /></svg>Bold
+                </button>
+              </div>
+              <div class="creativity-header">
+                <label for="creativity">A little creative freedom</label
+                ><span class="range-value" id="creativityLabel"
+                  >A little adventurous</span
+                >
+              </div>
+              <input
+                id="creativity"
+                type="range"
+                min="0"
+                max="100"
+                value="50"
+                aria-valuetext="A little adventurous"
+              />
+              <div class="range-labels">
+                <span>Keep it familiar</span><span>Surprise me</span>
+              </div>
+              <button type="submit" class="generate-button" id="generateButton">
+                <svg class="icon"><use href="#i-spark" /></svg
+                ><span id="generateText">Find my lyrics</span
+                ><svg class="icon"><use href="#i-arrow" /></svg>
+              </button>
+              <p class="shortcut">
+                A little shortcut: <kbd id="shortcutKey">Ctrl</kbd> +
+                <kbd>Enter</kbd>
+              </p>
+              <div id="errorBox" class="error" role="alert" hidden></div>
+            </form>
+            <section
+              class="card output"
+              id="outputCard"
+              aria-labelledby="outputHeading"
+              aria-busy="false"
+            >
+              <header class="output-head">
+                <div class="output-label" id="outputHeading">
+                  <svg class="icon"><use href="#i-file" /></svg>Your lyric sheet
+                </div>
+                <span class="sheet-status" id="sheetStatus"
+                  ><i></i>READY WHEN YOU ARE</span
+                >
+                <div class="output-actions" id="outputActions" hidden>
+                  <button
+                    class="icon-button"
+                    id="copyButton"
+                    title="Copy lyrics"
+                    aria-label="Copy lyrics"
+                  >
+                    <svg class="icon"><use href="#i-copy" /></svg></button
+                  ><button
+                    class="icon-button"
+                    id="downloadButton"
+                    title="Download lyrics"
+                    aria-label="Download lyrics"
+                  >
+                    <svg class="icon"><use href="#i-download" /></svg>
+                  </button>
+                </div>
+              </header>
+              <div class="empty-state" id="emptyState">
+                <div class="record-zone" id="recordZone">
+                  <div class="record-wrap" id="recordWrap">
+                    <button
+                      type="button"
+                      class="record-button"
+                      id="recordButton"
+                      aria-label="Spin the record"
+                      aria-pressed="false"
+                      title="Give it a spin"
+                    >
+                      <span class="record-disc" id="recordDisc"
+                        ><span class="record-label"
+                          ><span>SIDE A</span><strong>LyricWala.</strong
+                          ><span class="record-hole"></span
+                          ><span>FEEL SOMETHING</span></span
+                        ></span
+                      >
+                    </button>
+                  </div>
+                  <span class="floating-spark"
+                    ><svg class="icon"><use href="#i-spark" /></svg></span
+                  ><span class="orbit-label"
+                    ><svg class="icon"><use href="#i-wave" /></svg>words waiting
+                    to happen</span
+                  >
+                </div>
+                <h3 id="emptyTitle">
+                  Your next chorus<br />starts <em>right here.</em>
+                </h3>
+                <p id="emptyDescription">
+                  A few words from you.<br />A little creative possibility from
+                  us.
+                </p>
+                <div class="loading-panel" id="loadingPanel" hidden>
+                  <div class="progress-caption">
+                    <span id="progressStage">Getting your session ready</span
+                    ><span id="progressPercent">—</span>
+                  </div>
+                  <div
+                    class="progress-track indeterminate"
+                    id="progressTrack"
+                    role="progressbar"
+                    aria-label="Lyric generation progress"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  >
+                    <div class="progress-fill" id="progressFill"></div>
+                  </div>
+                  <button
+                    type="button"
+                    class="text-button cancel-button"
+                    id="cancelButton"
+                  >
+                    Cancel this take
+                  </button>
+                </div>
+              </div>
+              <div class="lyrics-state" id="lyricsState" hidden>
+                <div class="lyric-kicker">
+                  <i class="live-dot"></i><span id="takeLabel">TAKE 01</span>
+                </div>
+                <h3 class="lyric-title" id="lyricTitle"></h3>
+                <div class="lyric-meta" id="lyricMeta"></div>
+                <div
+                  class="lyric-body"
+                  id="lyricBody"
+                  tabindex="0"
+                  aria-label="Generated lyrics"
+                ></div>
+                <div class="sample-notice" id="sampleNotice" hidden>
+                  Illustrative sample lyrics for this preview. Connect your
+                  model to create lyrics from your own ideas.
+                </div>
+                <div class="lyrics-bottom">
+                  <button class="save-button" id="saveButton">
+                    <svg class="icon"><use href="#i-save" /></svg
+                    ><span>Save this take</span></button
+                  ><button class="text-button" id="againButton">
+                    <svg class="icon"><use href="#i-refresh" /></svg>Another
+                    take
+                  </button>
+                </div>
+              </div>
+              <footer class="output-foot">
+                <span
+                  ><svg class="icon"><use href="#i-spark" /></svg>A first draft.
+                  Make it yours.</span
+                ><span id="wordCount">A little room to create</span>
+              </footer>
+            </section>
+          </section>
+          <section class="inspiration">
+            <div class="section-heading">
+              <h2>Or, start with a spark.</h2>
+              <span>SMALL IDEAS. ENDLESS POSSIBILITIES.</span>
+            </div>
+            <div class="inspiration-grid">
+              <button class="inspiration-card" data-preset="0">
+                <span class="prompt-icon"
+                  ><svg class="icon"><use href="#i-moon" /></svg></span
+                ><span class="prompt-copy"
+                  ><strong>Midnight, windows down</strong
+                  ><span>City lights &amp; nowhere to be</span></span
+                ><svg class="icon"><use href="#i-arrow" /></svg></button
+              ><button class="inspiration-card" data-preset="1">
+                <span class="prompt-icon"
+                  ><svg class="icon"><use href="#i-heart" /></svg></span
+                ><span class="prompt-copy"
+                  ><strong>The one that got away</strong
+                  ><span>A goodbye that stayed with you</span></span
+                ><svg class="icon"><use href="#i-arrow" /></svg></button
+              ><button class="inspiration-card" data-preset="2">
+                <span class="prompt-icon"
+                  ><svg class="icon"><use href="#i-sun" /></svg></span
+                ><span class="prompt-copy"
+                  ><strong>A softer kind of Sunday</strong
+                  ><span>Slow mornings &amp; small joys</span></span
+                ><svg class="icon"><use href="#i-arrow" /></svg>
+              </button>
+            </div>
+          </section>
+        </div>
+        <section id="savedView" class="library-view" hidden>
+          <div class="library-top">
+            <div>
+              <div class="eyebrow">
+                <span class="line"></span>THE ONES WORTH KEEPING
+              </div>
+              <h1>Your little <span class="serif">collection.</span></h1>
+              <p>Saved on this browser. Ready for your next session.</p>
+            </div>
+            <input
+              type="search"
+              class="library-search"
+              id="savedSearch"
+              placeholder="Find a lyric…"
+              aria-label="Search saved lyrics"
+            />
+          </div>
+          <div id="savedGrid" class="saved-grid"></div>
+          <div id="savedEmpty" class="saved-empty">
+            <svg class="icon"><use href="#i-stack" /></svg>
+            <h2>A blank shelf. A fresh start.</h2>
+            <p>
+              When a take feels right, save it here.<br />Your first favorite is
+              a few words away.
+            </p>
+            <button id="emptyCreateButton" class="generate-button">
+              Let's write something<svg class="icon">
+                <use href="#i-arrow" />
+              </svg>
+            </button>
+          </div>
+        </section>
+        <footer class="footer">
+          <span>LyricWala © 2026</span
+          ><span
+            >Made with a little <span class="heart">♥</span> and a lot of
+            possibility.</span
+          >
+        </footer>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="sr-only" id="announcer" role="status" aria-live="polite"></div>
+    <dialog id="helpDialog">
+      <button
+        class="icon-button close-dialog"
+        id="closeHelp"
+        aria-label="Close help"
+      >
+        <svg class="icon"><use href="#i-close" /></svg>
+      </button>
+      <div class="eyebrow brand-inline">A SMALL GUIDE TO YOUR BIG IDEA</div>
+      <h2>Start with a feeling.</h2>
+      <div class="dialog-step">
+        <span class="number">01</span>
+        <p>
+          <strong>Tell your story.</strong><br />A memory, a scene, or just a
+          sentence. Specific details give your lyrics somewhere to go.
+        </p>
+      </div>
+      <div class="dialog-step">
+        <span class="number">02</span>
+        <p>
+          <strong>Make it sound like you.</strong><br />Choose a sound and a
+          mood. Creative freedom changes how adventurous the word choices can
+          be.
+        </p>
+      </div>
+      <div class="dialog-step">
+        <span class="number">03</span>
+        <p>
+          <strong>Keep the good take.</strong><br />Copy it, download it, or
+          save it on this browser. A first draft is a beginning — make it yours.
+        </p>
+      </div>
+      <p id="helpMode">
+        You're in preview mode. The examples are illustrative, not generated by
+        a connected model.
+      </p>
+    </dialog>
+    <script>
+      // FRONTEND CONNECTION SETTINGS. Switch mode to "api" when FastAPI is running.
+      // This file is independent of the model and can also be opened directly in a browser.
+      window.LYRICWALA_CONFIG ??= {
+        mode: "demo",
+        apiBaseUrl: "http://127.0.0.1:8000",
+      };
+      const CONFIG = window.LYRICWALA_CONFIG;
+      const $ = (id) => document.getElementById(id);
+      const icon = (name) =>
+        `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+      const readLocal = (key, fallback) => {
+        try {
+          return JSON.parse(localStorage.getItem(key)) ?? fallback;
+        } catch {
+          return fallback;
+        }
+      };
+      const writeLocal = (key, value) => {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      let saved = readLocal("lyricwala-takes-v1", []);
+      if (!Array.isArray(saved)) saved = [];
+      saved = saved.filter(
+        (x) =>
+          x &&
+          typeof x.id === "string" &&
+          typeof x.title === "string" &&
+          typeof x.lyrics === "string" &&
+          typeof x.genre === "string" &&
+          typeof x.mood === "string",
+      );
+      let mood = "Dreamy",
+        current = null,
+        controller = null,
+        takeNumber = 0,
+        toastTimer,
+        spinning = false;
+      const presets = [
+        {
+          prompt:
+            "A late-night drive with my closest friend. Windows down, empty city streets, and the feeling that for once we have nowhere else to be.",
+          genre: "Indie pop",
+          mood: "Dreamy",
+        },
+        {
+          prompt:
+            "Finding an old train ticket in a coat pocket and remembering someone I thought I had finally forgotten. A quiet goodbye without bitterness.",
+          genre: "Acoustic",
+          mood: "Melancholic",
+        },
+        {
+          prompt:
+            "A slow Sunday morning. Coffee going cold, sunlight on the kitchen floor, and learning to be happy with the small things.",
+          genre: "Indie pop",
+          mood: "Uplifting",
+        },
+        {
+          prompt:
+            "Finally moving to a new city alone. A tiny apartment, unfamiliar streets, and the courage to begin again.",
+          genre: "Pop",
+          mood: "Bold",
+        },
+        {
+          prompt:
+            "Two people sharing an umbrella in the rain. Missing the last bus on purpose just to stay together a little longer.",
+          genre: "R&B",
+          mood: "Romantic",
+        },
+      ];
+      // Original illustrative samples. Preview mode never pretends these are model outputs.
+      const samples = [
+        {
+          title: "Somewhere after midnight",
+          lyrics:
+            "[Verse]\nThe dashboard paints your hands in green\nWe miss the turn at Evergreen\nYou say the long way sounds like home\nSo I let the engine set the tone\n\n[Chorus]\nLet the city fall behind us\nLet the morning take its time\nWe have nothing left to run from\nAnd the whole night left to find",
+        },
+        {
+          title: "The things a pocket keeps",
+          lyrics:
+            "[Verse]\nA faded ticket, folded twice\nA winter coat that smells like rain\nI thought that I had paid the price\nOf never saying your name again\n\n[Chorus]\nSome things stay without a sound\nA little weight I carry round\nI can let you go and keep\nThe things a pocket keeps",
+        },
+        {
+          title: "Nothing much, everything",
+          lyrics:
+            "[Verse]\nYour coffee cools beside the sink\nI leave the dishes where they are\nThe quiet gives us room to think\nOf all the ways we have come far\n\n[Chorus]\nNothing much and everything\nAn open window, early spring\nI used to wish the days away\nNow I wish this one would stay",
+        },
+        {
+          title: "A key of my own",
+          lyrics:
+            "[Verse]\nFour bare walls and a borrowed chair\nA box of books on the kitchen tile\nI catch my face in the window there\nAnd try this new beginning on a while\n\n[Chorus]\nI have a key of my own now\nA street that will learn my name\nI do not have it all figured out\nBut I am coming home just the same",
+        },
+        {
+          title: "One umbrella",
+          lyrics:
+            "[Verse]\nThe last bus blinks around the bend\nYour shoulder finds its way to mine\nWe both pretend the rain will end\nAnd both forget to check the time\n\n[Chorus]\nLeave a little room for weather\nLet the sky do what it does\nThere is nowhere I would rather\nThan this small dry world of us",
+        },
+      ];
+      function toast(message) {
+        clearTimeout(toastTimer);
+        $("toast").textContent = message;
+        $("toast").classList.add("visible");
+        toastTimer = setTimeout(
+          () => $("toast").classList.remove("visible"),
+          3000,
+        );
+      }
+      function setTheme(theme) {
+        document.documentElement.dataset.theme = theme;
+        $("lightTheme").setAttribute("aria-pressed", theme === "light");
+        $("darkTheme").setAttribute("aria-pressed", theme === "dark");
+        writeLocal("lyricwala-theme", theme);
+      }
+      setTheme(
+        readLocal("lyricwala-theme", "light") === "dark" ? "dark" : "light",
+      );
+      $("lightTheme").onclick = () => setTheme("light");
+      $("darkTheme").onclick = () => setTheme("dark");
+      function setMood(value) {
+        mood = value;
+        document
+          .querySelectorAll("[data-mood]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", b.dataset.mood === value),
+          );
+      }
+      document
+        .querySelectorAll("[data-mood]")
+        .forEach((b) => (b.onclick = () => setMood(b.dataset.mood)));
+      function updatePrompt() {
+        $("charCount").textContent = $("prompt").value.length;
+        $("prompt").setCustomValidity("");
+      }
+      $("prompt").oninput = updatePrompt;
+      function fillPreset(index) {
+        if (controller) return;
+        const p = presets[index];
+        $("prompt").value = p.prompt;
+        $("genre").value = p.genre;
+        setMood(p.mood);
+        updatePrompt();
+        $("prompt").focus();
+      }
+      document
+        .querySelectorAll("[data-preset]")
+        .forEach(
+          (b) => (b.onclick = () => fillPreset(Number(b.dataset.preset))),
+        );
+      $("surpriseButton").onclick = () => {
+        const choices = presets
+          .map((_, i) => i)
+          .filter((i) => presets[i].prompt !== $("prompt").value);
+        fillPreset(choices[Math.floor(Math.random() * choices.length)]);
+      };
+      $("creativity").oninput = () => {
+        const v = Number($("creativity").value),
+          label =
+            v < 30
+              ? "Comfortably familiar"
+              : v > 70
+                ? "Beautifully unexpected"
+                : "A little adventurous";
+        $("creativityLabel").textContent = label;
+        $("creativity").setAttribute("aria-valuetext", label);
+        $("creativity").style.background =
+          `linear-gradient(to right,var(--green) ${v}%,var(--border) ${v}%)`;
+      };
+      const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+      $("recordZone").onpointermove = (e) => {
+        if (reducedMotion.matches || e.pointerType === "touch") return;
+        const r = e.currentTarget.getBoundingClientRect();
+        $("recordWrap").style.setProperty(
+          "--rx",
+          `${-((e.clientY - r.top) / r.height - 0.5) * 14}deg`,
+        );
+        $("recordWrap").style.setProperty(
+          "--ry",
+          `${((e.clientX - r.left) / r.width - 0.5) * 14}deg`,
+        );
+      };
+      $("recordZone").onpointerleave = () => {
+        $("recordWrap").style.setProperty("--rx", "0deg");
+        $("recordWrap").style.setProperty("--ry", "0deg");
+      };
+      $("recordButton").onclick = () => {
+        spinning = !spinning;
+        $("recordDisc").classList.toggle("spinning", spinning);
+        $("recordButton").setAttribute("aria-pressed", spinning);
+        $("recordButton").setAttribute(
+          "aria-label",
+          spinning ? "Stop spinning the record" : "Spin the record",
+        );
+      };
+      function navigate(view) {
+        $("studioView").hidden = view !== "studio";
+        $("savedView").hidden = view !== "saved";
+        $("navStudio").classList.toggle("active", view === "studio");
+        $("navSaved").classList.toggle("active", view === "saved");
+        $("navStudio").setAttribute(
+          "aria-current",
+          view === "studio" ? "page" : "false",
+        );
+        $("navSaved").setAttribute(
+          "aria-current",
+          view === "saved" ? "page" : "false",
+        );
+        $("breadcrumbCurrent").textContent =
+          view === "studio" ? "Writing studio" : "Saved lyrics";
+        if (view === "saved") renderSaved();
+      }
+      $("navStudio").onclick = () => navigate("studio");
+      $("navSaved").onclick = () => navigate("saved");
+      $("emptyCreateButton").onclick = () => {
+        navigate("studio");
+        $("prompt").focus();
+      };
+      document.querySelector(".brand").onclick = (e) => {
+        e.preventDefault();
+        navigate("studio");
+      };
+      $("helpButton").onclick = () => $("helpDialog").showModal();
+      $("closeHelp").onclick = () => $("helpDialog").close();
+      $("helpDialog").onclick = (e) => {
+        if (e.target === $("helpDialog")) {
+          const r = e.target.getBoundingClientRect();
+          if (
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom
+          )
+            e.target.close();
+        }
+      };
+      function updateSaveButton() {
+        const exists = current && saved.some((x) => x.id === current.id);
+        $("saveButton").classList.toggle("saved", !!exists);
+        $("saveButton").innerHTML =
+          icon(exists ? "check" : "save") +
+          `<span>${exists ? "Saved to your collection" : "Save this take"}</span>`;
+        $("savedCount").textContent = saved.length;
+      }
+      function renderLyrics(item) {
+        current = item;
+        $("emptyState").hidden = true;
+        $("lyricsState").hidden = false;
+        $("outputActions").hidden = false;
+        $("sheetStatus").hidden = true;
+        $("lyricTitle").textContent = item.title;
+        $("lyricMeta").textContent = `${item.genre}  ·  ${item.mood}`;
+        $("takeLabel").textContent = item.demo
+          ? "PREVIEW TAKE"
+          : `TAKE ${String(item.take || 1).padStart(2, "0")}`;
+        $("sampleNotice").hidden = !item.demo;
+        $("lyricBody").replaceChildren();
+        // Text nodes ensure model output is never interpreted as HTML or script.
+        const text = item.lyrics.replace(
+          /<(VERSE(?:_\d+)?|CHORUS|PRE[-_]CHORUS|POST[-_]CHORUS|BRIDGE|OUTRO|INTRO|REFRAIN)>/gi,
+          "\n[$1]\n",
+        );
+        for (const line of text.split("\n")) {
+          const tag = line.trim().match(/^\[([^\]]+)\]$/);
+          const el = document.createElement(tag ? "h4" : "p");
+          el.textContent = tag ? tag[1].replaceAll("_", " ") : line || "\u00a0";
+          $("lyricBody").append(el);
+        }
+        $("wordCount").textContent =
+          `${item.lyrics.trim().split(/\s+/).length} words`;
+        updateSaveButton();
+      }
+      function renderSaved() {
+        const query = $("savedSearch").value.toLocaleLowerCase();
+        const items = saved.filter((s) =>
+          (s.title + " " + s.lyrics).toLocaleLowerCase().includes(query),
+        );
+        $("savedGrid").replaceChildren();
+        $("savedEmpty").hidden = items.length > 0;
+        $("savedEmpty").querySelector("h2").textContent = query
+          ? "No matching takes."
+          : "A blank shelf. A fresh start.";
+        $("savedEmpty").querySelector("p").textContent = query
+          ? "Try a different word or clear your search."
+          : "When a take feels right, save it here. Your first favorite is a few words away.";
+        for (const item of items) {
+          const card = document.createElement("article");
+          card.className = "card saved-card";
+          const kicker = document.createElement("div");
+          kicker.className = "lyric-kicker";
+          kicker.textContent = `${item.genre} · ${item.mood}${item.demo ? " · SAMPLE" : ""}`;
+          const title = document.createElement("h2");
+          title.textContent = item.title;
+          const excerpt = document.createElement("p");
+          excerpt.textContent = item.lyrics.replace(/\[[^\]]*\]/g, "").trim();
+          const foot = document.createElement("div");
+          foot.className = "saved-card-foot";
+          const date = document.createElement("span");
+          date.className = "saved-date";
+          date.textContent = new Date(item.createdAt).toLocaleDateString(
+            undefined,
+            { month: "short", day: "numeric" },
+          );
+          const actions = document.createElement("div");
+          actions.className = "output-actions";
+          const open = document.createElement("button");
+          open.className = "text-button";
+          open.textContent = "Open take →";
+          open.onclick = () => {
+            if (controller) {
+              toast("Finish or cancel your current take first.");
+              return;
+            }
+            navigate("studio");
+            $("prompt").value = item.prompt;
+            updatePrompt();
+            $("genre").value = item.genre;
+            setMood(item.mood);
+            $("length").value = item.length || "standard";
+            $("creativity").value = item.creativity ?? 50;
+            $("creativity").oninput();
+            renderLyrics(item);
+          };
+          const remove = document.createElement("button");
+          remove.className = "icon-button";
+          remove.title = "Remove from saved lyrics";
+          remove.setAttribute("aria-label", `Remove ${item.title}`);
+          remove.innerHTML = icon("trash");
+          remove.onclick = () => {
+            const next = saved.filter((x) => x.id !== item.id);
+            if (!writeLocal("lyricwala-takes-v1", next)) {
+              toast("Your browser could not update saved lyrics.");
+              return;
+            }
+            saved = next;
+            renderSaved();
+            updateSaveButton();
+            toast("Take removed from your collection.");
+          };
+          actions.append(open, remove);
+          foot.append(date, actions);
+          card.append(kicker, title, excerpt, foot);
+          $("savedGrid").append(card);
+        }
+      }
+      $("savedSearch").oninput = renderSaved;
+      $("saveButton").onclick = () => {
+        if (!current || saved.some((x) => x.id === current.id)) return;
+        const next = [current, ...saved];
+        if (!writeLocal("lyricwala-takes-v1", next)) {
+          toast("Your browser could not save this take. Try downloading it.");
+          return;
+        }
+        saved = next;
+        updateSaveButton();
+        toast("A good take, kept safe.");
+      };
+      $("copyButton").onclick = async () => {
+        if (!current) return;
+        const text = current.title + "\n\n" + current.lyrics;
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const area = document.createElement("textarea");
+            area.value = text;
+            area.style.position = "fixed";
+            area.style.opacity = "0";
+            document.body.append(area);
+            area.select();
+            const ok = document.execCommand("copy");
+            area.remove();
+            if (!ok) throw Error();
+          }
+          toast("Lyrics copied. Go make them yours.");
+        } catch {
+          toast("Copy is unavailable here. Download your lyrics instead.");
+        }
+      };
+      $("downloadButton").onclick = () => {
+        if (!current) return;
+        const blob = new Blob(
+          [
+            current.title +
+              "\n\n" +
+              current.lyrics +
+              "\n\n" +
+              (current.demo
+                ? "LyricWala illustrative preview sample."
+                : "Created with LyricWala."),
+          ],
+          { type: "text/plain;charset=utf-8" },
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download =
+          (current.title.replace(/[^a-z0-9 -]/gi, "").trim() ||
+            "LyricWala-take") + ".txt";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast("Your words, ready to take with you.");
+      };
+      function setBusy(busy) {
+        $("outputCard").setAttribute("aria-busy", busy);
+        $("outputCard").classList.toggle("is-generating", busy);
+        $("loadingPanel").hidden = !busy;
+        $("generateButton").disabled = busy;
+        $("generateText").textContent = busy
+          ? "Finding your words…"
+          : "Find my lyrics";
+        for (const el of $("composerForm").querySelectorAll(
+          "input,select,textarea,button:not(#generateButton)",
+        ))
+          el.disabled = busy;
+        document
+          .querySelectorAll("[data-preset]")
+          .forEach((b) => (b.disabled = busy));
+        $("againButton").disabled = busy;
+        if (busy) {
+          $("emptyState").hidden = false;
+          $("lyricsState").hidden = true;
+          $("outputActions").hidden = true;
+          $("sheetStatus").hidden = false;
+          $("sheetStatus").textContent = "A NEW TAKE IN THE MAKING";
+          $("emptyTitle").textContent = "Finding your rhythm.";
+          $("emptyDescription").textContent =
+            "A little space for the words to come together.";
+          $("progressStage").textContent = "Getting your session ready";
+          $("progressPercent").textContent = "—";
+          $("progressFill").style.width = "0%";
+          $("progressTrack").classList.add("indeterminate");
+          $("progressTrack").removeAttribute("aria-valuenow");
+          $("wordCount").textContent = "Good things take a few verses";
+        }
+      }
+      function resetEmpty() {
+        if (current) {
+          renderLyrics(current);
+          return;
+        }
+        $("emptyState").hidden = false;
+        $("lyricsState").hidden = true;
+        $("sheetStatus").hidden = false;
+        $("sheetStatus").innerHTML = "<i></i>READY WHEN YOU ARE";
+        $("emptyTitle").innerHTML =
+          "Your next chorus<br>starts <em>right here.</em>";
+        $("emptyDescription").innerHTML =
+          "A few words from you.<br>A little creative possibility from us.";
+        $("wordCount").textContent = "A little room to create";
+      }
+      function progress(event) {
+        const value = Math.max(0, Math.min(100, Number(event.progress) || 0));
+        $("progressTrack").classList.remove("indeterminate");
+        $("progressFill").style.width = value + "%";
+        $("progressTrack").setAttribute("aria-valuenow", Math.round(value));
+        $("progressPercent").textContent = Math.round(value) + "%";
+        $("progressStage").textContent = event.stage || "Finding your words";
+      }
+      const wait = (ms, signal) =>
+        new Promise((resolve, reject) => {
+          if (signal.aborted) {
+            reject(new DOMException("Cancelled", "AbortError"));
+            return;
+          }
+          const abort = () => {
+            clearTimeout(timer);
+            reject(new DOMException("Cancelled", "AbortError"));
+          };
+          const timer = setTimeout(() => {
+            signal.removeEventListener("abort", abort);
+            resolve();
+          }, ms);
+          signal.addEventListener("abort", abort, { once: true });
+        });
+      async function demoGenerate(request, signal) {
+        for (let step = 1; step <= 24; step++) {
+          await wait(145 + Math.random() * 70, signal);
+          progress({
+            progress: (step / 24) * 100,
+            stage:
+              step < 8
+                ? "Finding the feeling"
+                : step < 17
+                  ? "Putting words into motion"
+                  : "Finishing this little take",
+          });
+        }
+        const index = /ticket|goodbye|forgotten/i.test(request.prompt)
+          ? 1
+          : /sunday|coffee|morning/i.test(request.prompt)
+            ? 2
+            : /city alone|apartment|begin again/i.test(request.prompt)
+              ? 3
+              : /umbrella|rain|together/i.test(request.prompt)
+                ? 4
+                : 0;
+        const sample = samples[index];
+        let lyrics = sample.lyrics;
+        if (request.length === "short")
+          lyrics = lyrics.slice(lyrics.indexOf("[Chorus]"));
+        return { ...sample, lyrics, demo: true };
+      }
+      async function apiGenerate(request, signal) {
+        const response = await fetch(
+          CONFIG.apiBaseUrl.replace(/\/$/, "") + "/api/generate",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/x-ndjson",
+            },
+            body: JSON.stringify(request),
+            signal,
+          },
+        );
+        if (!response.ok) {
+          let detail;
+          try {
+            const body = await response.json();
+            detail =
+              typeof body.detail === "string"
+                ? body.detail
+                : body.detail?.map((x) => x.msg).join("; ");
+          } catch {}
+          throw new Error(
+            detail ||
+              `The studio couldn't start this take (${response.status}).`,
+          );
+        }
+        if (!response.body)
+          throw new Error("Your browser cannot read the lyric stream.");
+        const reader = response.body.getReader(),
+          decoder = new TextDecoder();
+        let buffer = "",
+          result = null;
+        const handle = (line) => {
+          if (!line.trim()) return;
+          const event = JSON.parse(line);
+          if (event.type === "error")
+            throw new Error(
+              event.message || "Generation failed. Please try again.",
+            );
+          if (event.type === "progress") progress(event);
+          if (event.type === "result") result = event;
+        };
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              buffer += decoder.decode();
+              break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+            for (const line of lines) handle(line);
+          }
+          if (buffer.trim()) handle(buffer);
+          if (
+            !result ||
+            typeof result.lyrics !== "string" ||
+            !result.lyrics.trim()
+          )
+            throw new Error(
+              "The studio did not return lyrics. Please try again.",
+            );
+          return result;
+        } finally {
+          await reader.cancel().catch(() => {});
+          reader.releaseLock();
+        }
+      }
+      async function generate(event) {
+        event?.preventDefault();
+        if (controller) return;
+        const prompt = $("prompt").value.trim();
+        if (!prompt) {
+          $("prompt").setCustomValidity(
+            "Give your song a little starting point.",
+          );
+          $("prompt").reportValidity();
+          return;
+        }
+        if (!$("composerForm").reportValidity()) return;
+        $("errorBox").hidden = true;
+        const request = {
+          prompt,
+          genre: $("genre").value,
+          mood,
+          length: $("length").value,
+          creativity: Number($("creativity").value),
+        };
+        const activeController = new AbortController();
+        controller = activeController;
+        let timedOut = false;
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          activeController.abort();
+        }, 180000);
+        setBusy(true);
+        $("announcer").textContent =
+          "Creating your lyrics. You can cancel this take at any time.";
+        try {
+          const result =
+            CONFIG.mode === "api"
+              ? await apiGenerate(request, activeController.signal)
+              : await demoGenerate(request, activeController.signal);
+          if (activeController.signal.aborted) return;
+          takeNumber++;
+          const item = {
+            ...request,
+            ...result,
+            id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+            createdAt: new Date().toISOString(),
+            take: takeNumber,
+            title:
+              typeof result.title === "string" && result.title.trim()
+                ? result.title
+                : "An untitled feeling",
+          };
+          setBusy(false);
+          renderLyrics(item);
+          $("announcer").textContent = "Your lyric sheet is ready.";
+          if (matchMedia("(max-width:720px)").matches)
+            $("outputCard").scrollIntoView({
+              behavior: reducedMotion.matches ? "instant" : "smooth",
+              block: "start",
+            });
+        } catch (error) {
+          setBusy(false);
+          resetEmpty();
+          if (error.name === "AbortError" && !timedOut) {
+            toast("Take cancelled. Your idea is still here.");
+            $("announcer").textContent = "Generation cancelled.";
+          } else {
+            $("errorBox").textContent = timedOut
+              ? "This take took longer than expected. Please try again."
+              : error instanceof TypeError
+                ? "The writing studio is unavailable. Check that the lyric service is running, then try again."
+                : error.message;
+            $("errorBox").hidden = false;
+            $("announcer").textContent =
+              "Generation failed. Your idea has been kept.";
+          }
+        } finally {
+          clearTimeout(timeout);
+          controller = null;
+          setBusy(false);
+        }
+      }
+      $("composerForm").onsubmit = generate;
+      $("againButton").onclick = () => generate();
+      $("cancelButton").onclick = () => controller?.abort();
+      document.addEventListener("keydown", (e) => {
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          e.key === "Enter" &&
+          !$("studioView").hidden &&
+          !$("helpDialog").open
+        ) {
+          e.preventDefault();
+          $("composerForm").requestSubmit();
+        }
+      });
+      if (/Mac|iPhone|iPad/.test(navigator.platform))
+        $("shortcutKey").textContent = "⌘";
+      if (CONFIG.mode === "api") {
+        $("modeBadge").innerHTML = '<i class="live-dot"></i>Writing studio';
+        $("helpMode").textContent =
+          "Lyrics come from your connected model. Saved takes stay on this browser.";
+        fetch(CONFIG.apiBaseUrl.replace(/\/$/, "") + "/api/health", {
+          signal: AbortSignal.timeout(4000),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.mode === "demo") {
+              $("modeBadge").innerHTML = '<i class="live-dot"></i>Preview mode';
+              $("helpMode").textContent =
+                "The service is running in demo mode with illustrative sample lyrics.";
+            }
+          })
+          .catch(() => {});
+      }
+      updateSaveButton();
+    </script>
+  </body>
+</html>

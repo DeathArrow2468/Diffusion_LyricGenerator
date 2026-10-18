@@ -1,0 +1,6 @@
+-r requirements.txt
+# Use the same PyTorch/Transformers environment as the checkpoint's training run.
+# Install a CUDA-enabled PyTorch build separately for your GPU before using this file.
+torch>=2.6
+transformers>=4.56,<6
+safetensors>=0.4

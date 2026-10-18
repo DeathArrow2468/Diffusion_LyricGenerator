@@ -19,9 +19,20 @@ CHECKPOINT_DIR = "./checkpoints"
 
 ################ MAKE STRICT PYTHON PACKAGES LATER #####################
 
-STRUCTURAL_TOKENS = ["<VERSE_1>", "<VERSE_2>", "<VERSE_3>", "<VERSE_4>", "<VERSE_5>","<VERSE_6", "<CHORUS>", "<BRIDGE>", "<OUTRO>"]
+STRUCTURAL_TOKENS = ["<VERSE_1>", "<VERSE_2>", "<VERSE_3>", "<VERSE_4>", "<VERSE_5>","<VERSE_6>", "<CHORUS>", "<BRIDGE>", "<OUTRO>"]
 
 # We need clear boundary tokens to separate the Prompt from the Lyrics, 
 # and to corrupt the text during diffusion.
 SEP_TOKEN = "[SEP]"
 MASK_TOKEN = "[MASK]"
+
+
+########### Don't know what these do exactly  ##############
+SEED = 42
+
+# Diffusion masking settings
+MASK_EPSILON = 1e-3
+FULL_MASK_PROBABILITY = 0.10
+
+# Keep 0 on Windows for now. Increase later if data loading becomes slow.
+NUM_WORKERS = 0
