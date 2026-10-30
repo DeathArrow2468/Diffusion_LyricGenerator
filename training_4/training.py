@@ -1,34 +1,53 @@
-# 04_training/train.py
 import math
+import json
+from dataclasses import asdict
+from pathlib import Path
 import os
 import random
 import sys
 
-import matplotlib  
+import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  
+import matplotlib.pyplot as plt
 
 import numpy as np
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from torch.optim import AdamW
 from tqdm import tqdm
-from transformers import get_linear_schedule_with_warmup
+from transformers import AutoTokenizer, get_linear_schedule_with_warmup
 
-import config
+# Resolve project imports from the script location, not the working directory.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+from training_4 import config
+from loss_func_1.config_loss import LOSS_CONFIG
+from loss_func_1.hybrid_loss import HybridLoss
+from loss_func_1.hybrid_batch import HybridCollateFn
+from diffusion_model_3.model import BidirectionalDiffusionTransformer
 
-# Add the parent directory to Python's path so we can import our previous modules
-sys.path.append(os.path.abspath(".."))
 
-from masking_tokenization_2.tokenizer import (
-    setup_tokenizer,
-    LyricDiffusionDataset,
-    MaskingCollateFn,
-)
-from diffusion_model_3.model import (
-    BidirectionalDiffusionTransformer,
-)
+def setup_tokenizer():
+    """Use this training config explicitly; no ambiguous `import config`."""
+    tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
+    tokenizer.add_special_tokens({"additional_special_tokens":
+        config.STRUCTURAL_TOKENS + [config.SEP_TOKEN, config.MASK_TOKEN]})
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    return tokenizer
+
+
+class LyricDiffusionDataset(Dataset):
+    """Same prompt/lyrics JSONL format; independent of the old masking module."""
+    def __init__(self, path):
+        with open(path, encoding="utf-8") as handle:
+            self.data = [json.loads(line) for line in handle if line.strip()]
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        return self.data[index]
 
 
 def set_seed(seed):
@@ -81,7 +100,7 @@ def create_optimizer(model):
     )
 
 
-def save_training_curves(  
+def save_training_curves(
     step_losses,
     step_accuracies,
     epoch_losses,
@@ -121,7 +140,7 @@ def save_training_curves(
     print(f"Training graph saved to {graph_path}")
 
 
-def train():
+def train(device=None):
     # ==========================================
     # 1. INITIALIZATION & SETUP
     # ==========================================
@@ -130,14 +149,8 @@ def train():
     os.makedirs(config.CHECKPOINT_DIR, exist_ok=True)
 
     # Automatically detect if you have an Nvidia GPU (CUDA) available, otherwise use CPU
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
-    )
-
-    # if device.type != "cuda":
-    #     raise RuntimeError(
-    #         "This full Qwen FP32 training configuration needs a CUDA GPU."
-    #     )
+    device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+    use_bf16 = device.type == "cuda" and torch.cuda.is_bf16_supported()
 
     print(f"Executing training on: {device.type.upper()}")
 
@@ -146,16 +159,22 @@ def train():
     tokenizer = setup_tokenizer()
     dataset = LyricDiffusionDataset(config.DATASET_PATH)
 
-    collate_fn = MaskingCollateFn(
+    if not len(dataset):
+        raise ValueError("Training dataset is empty")
+    if config.GRAD_ACCUM_STEPS < 1 or config.EPOCHS < 1:
+        raise ValueError("GRAD_ACCUM_STEPS and EPOCHS must be positive")
+
+    collate_fn = HybridCollateFn(
         tokenizer=tokenizer,
         max_len=config.MAX_SEQ_LEN,
-        mask_epsilon=getattr(config, "MASK_EPSILON", 1e-3),
-        full_mask_probability=getattr(
-            config,
-            "FULL_MASK_PROBABILITY",
-            0.10,
-        ),
+        config=LOSS_CONFIG,
+        sep_token=config.SEP_TOKEN,
+        mask_token=config.MASK_TOKEN,
     )
+
+    objective = HybridLoss(LOSS_CONFIG).to(device)
+
+
 
     # The DataLoader is our engine. It grabs raw JSON rows, passes them to collate_fn,
     # and hands us perfectly formatted, masked tensors.
@@ -165,7 +184,7 @@ def train():
         shuffle=True,
         collate_fn=collate_fn,
         num_workers=getattr(config, "NUM_WORKERS", 0),
-        pin_memory=True,
+        pin_memory=device.type == "cuda",
     )
 
     print("Loading Bidirectional Diffusion Model...")
@@ -173,6 +192,7 @@ def train():
     model = BidirectionalDiffusionTransformer(
         config.MODEL_NAME,
         len(tokenizer),
+        dtype=torch.float32,
     ).to(device)
 
     # All trainable weights must be stored in FP32.
@@ -236,10 +256,11 @@ def train():
     # This is temporary: once we add a validation split, use validation loss instead.
     best_loss = float("inf")
 
-    step_losses = []  
-    step_accuracies = []  
-    epoch_losses = []  
-    epoch_accuracies = []  
+    completed_steps = 0
+    step_losses = []
+    step_accuracies = []
+    epoch_losses = []
+    epoch_accuracies = []
 
     # ==========================================
     # 3. THE CORE TRAINING LOOP
@@ -248,8 +269,11 @@ def train():
         model.train()  # Put the model in training mode (enables dropout, etc.)
 
         total_loss = 0.0
-        epoch_correct = 0  
-        epoch_masked = 0  
+        examples_seen = 0
+        total_ar = 0.0
+        total_distance = 0.0
+        epoch_correct = 0
+        epoch_masked = 0
         optimizer.zero_grad(set_to_none=True)
 
         # Create a terminal progress bar
@@ -260,116 +284,63 @@ def train():
         )
 
         for step, batch in progress_bar:
-            # Move all our data from system RAM to GPU VRAM
-            input_ids = batch["input_ids"].to(
-                device,
-                non_blocking=True,
+            batch = {key: value.to(device, non_blocking=device.type == "cuda")
+                     for key, value in batch.items()}
+            batch_size = batch["input_ids"].size(0)
+            group_start = (step // config.GRAD_ACCUM_STEPS) * config.GRAD_ACCUM_STEPS
+            group_examples = min(
+                config.GRAD_ACCUM_STEPS * config.MICRO_BATCH_SIZE,
+                len(dataset) - group_start * config.MICRO_BATCH_SIZE,
             )
+            accumulation_scale = batch_size / group_examples
+            ar_value = 0.0
+            distance_value = 0.0
+            correct = masked_count = 0
+            h_used = objective.half_life(completed_steps, total_steps)
 
-            labels = batch["labels"].to(
-                device,
-                non_blocking=True,
-            )
+            # Pass 1: clean text and causal attention. Update gradients, not weights.
+            if LOSS_CONFIG.alpha > 0:
+                with torch.autocast(device_type=device.type, dtype=torch.bfloat16,
+                                    enabled=use_bf16):
+                    ar_logits = model(batch["ar_input_ids"], batch["ar_attention_mask"], mode="ar")
+                    ar_loss = objective.ar_loss(ar_logits, batch["ar_labels"])
+                if not torch.isfinite(ar_loss):
+                    raise RuntimeError(f"Invalid AR loss at epoch {epoch+1}, batch {step+1}")
+                (LOSS_CONFIG.alpha * ar_loss * accumulation_scale).backward()
+                ar_value = ar_loss.detach().item()
+                del ar_logits, ar_loss
 
-            attention_mask = batch["attention_mask"].to(
-                device,
-                non_blocking=True,
-            )
+            # Pass 2: corrupted block and bidirectional attention. Same model weights.
+            if LOSS_CONFIG.alpha < 1:
+                with torch.autocast(device_type=device.type, dtype=torch.bfloat16,
+                                    enabled=use_bf16):
+                    logits = model(batch["input_ids"], batch["attention_mask"],
+                                   batch["timesteps"], mode="denoising")
+                    distance_loss = objective.distance_loss(
+                        logits, batch["labels"], batch["prefix_end"],
+                        completed_steps, total_steps,
+                    )
+                if not torch.isfinite(distance_loss):
+                    raise RuntimeError(f"Invalid distance loss at epoch {epoch+1}, batch {step+1}")
+                with torch.no_grad():
+                    masked_positions = batch["labels"].ne(LOSS_CONFIG.ignore_index)
+                    correct = ((logits.argmax(-1) == batch["labels"]) & masked_positions).sum().item()
+                    masked_count = masked_positions.sum().item()
+                ((1 - LOSS_CONFIG.alpha) * distance_loss * accumulation_scale).backward()
+                distance_value = distance_loss.detach().item()
+                del logits, distance_loss
 
-            timesteps = batch["timesteps"].to(
-                device,
-                non_blocking=True,
-            )
-
-            loss_weights = batch["loss_weights"].to(
-                device,
-                non_blocking=True,
-            )
-
-            target_lengths = batch["target_lengths"].to(
-                device,
-                non_blocking=True,
-            )
-
-            # --- AUTOMATIC MIXED PRECISION (AMP) ---
-            # The model's actual stored weights stay in float32.
-            # BF16 is used only for suitable GPU calculations, which saves VRAM and speeds training.
-            with torch.autocast(
-                device_type="cuda",
-                dtype=torch.float32,
-                enabled=True,
-            ):
-                # 1. Forward Pass: Push the noisy sequence through the bidirectional architecture
-                logits = model(
-                    input_ids,
-                    attention_mask,
-                    timesteps,
-                )
-
-                # 2. Loss Calculation
-                # logits shape is [Batch, Seq_Len, Vocab_Size].
-                # labels shape is [Batch, Seq_Len].
-                #
-                # CrossEntropy completely ignores prompt, padding, and clean lyric positions,
-                # because those labels contain -100. It grades ONLY [MASK] positions.
-                token_losses = F.cross_entropy(
-                    logits.reshape(-1, logits.size(-1)),
-                    labels.reshape(-1),
-                    ignore_index=-100,
-                    reduction="none",
-                ).reshape_as(labels)
-
-                # Each masked token is weighted by 1 / mask_ratio.
-                # This stops a highly masked song from unfairly dominating the loss.
-                #
-                # Dividing by target_lengths gives every lyric example equal importance,
-                # even when songs contain different numbers of lyric tokens.
-                example_losses = (
-                    (token_losses * loss_weights).sum(dim=1)
-                    / target_lengths
-                )
-
-                unscaled_loss = example_losses.mean()
-
-            with torch.no_grad():  
-                masked_positions = labels != -100  
-                correct = (  
-                    (logits.argmax(dim=-1) == labels) & masked_positions  
-                ).sum().item()  
-                masked_count = masked_positions.sum().item()  
-
-            epoch_correct += correct  
-            epoch_masked += masked_count  
-            step_losses.append(unscaled_loss.item())  
-            step_accuracies.append(  
-                correct / masked_count if masked_count > 0 else float("nan")  
-            )  
-
-            if not torch.isfinite(unscaled_loss):
-                raise RuntimeError(
-                    f"Loss became invalid at epoch {epoch + 1}, "
-                    f"step {step + 1}: {unscaled_loss.item()}"
-                )
-
-            # 3. Gradient Accumulation Math
-            # If we accumulate 8 times, each micro-batch contributes 1/8th
-            # of the final gradient. The final partial group uses its true size.
-            current_group_start = (
-                step // config.GRAD_ACCUM_STEPS
-            ) * config.GRAD_ACCUM_STEPS
-
-            current_group_size = min(
-                config.GRAD_ACCUM_STEPS,
-                len(dataloader) - current_group_start,
-            )
-
-            scaled_loss = unscaled_loss / current_group_size
-
-            # 4. Backward Pass: Calculate the gradients (how much to adjust the weights)
-            scaled_loss.backward()
-
-            # Keep a running total of the true loss for our end-of-epoch average
-            total_loss += unscaled_loss.item()
+            # For logging only: both weighted gradients have already accumulated.
+            # Do NOT call backward() again on this combined scalar.
+            unscaled_loss = LOSS_CONFIG.alpha * ar_value + (1 - LOSS_CONFIG.alpha) * distance_value
+            total_loss += unscaled_loss * batch_size
+            total_ar += ar_value * batch_size
+            total_distance += distance_value * batch_size
+            examples_seen += batch_size
+            epoch_correct += correct
+            epoch_masked += masked_count
+            step_losses.append(unscaled_loss)
+            step_accuracies.append(correct / masked_count if masked_count else float("nan"))
 
             # --- GRADIENT ACCUMULATION & CLIPPING ---
             # Only update the actual model weights once we have accumulated a full macro-batch
@@ -388,12 +359,18 @@ def train():
 
                 optimizer.step()  # Apply the weight updates
                 scheduler.step()  # Slightly adjust the learning rate
+                completed_steps += 1
                 optimizer.zero_grad(set_to_none=True)  # Wipe the accumulated gradients clean
 
             # Update progress bar to show both loss and the dynamically changing learning rate
             progress_bar.set_postfix(
                 {
-                    "loss": f"{unscaled_loss.item():.4f}",
+                    "loss": f"{unscaled_loss:.4f}",
+                    "ar": f"{ar_value:.4f}",
+                    "distance": f"{distance_value:.4f}",
+                    "ar_weighted": f"{LOSS_CONFIG.alpha * ar_value:.4f}",
+                    "den_weighted": f"{(1-LOSS_CONFIG.alpha) * distance_value:.4f}",
+                    "h": h_used,
                     "lr": f"{scheduler.get_last_lr()[0]:.2e}",
                 }
             )
@@ -401,10 +378,10 @@ def train():
         # ==========================================
         # 4. BEST LOSS CHECKPOINTING
         # ==========================================
-        avg_loss = total_loss / len(dataloader)
+        avg_loss = total_loss / examples_seen
 
-        epoch_losses.append(avg_loss)  
-        epoch_accuracies.append(epoch_correct / max(epoch_masked, 1))  
+        epoch_losses.append(avg_loss)
+        epoch_accuracies.append(epoch_correct / epoch_masked if epoch_masked else float("nan"))
 
         print(
             f"Epoch {epoch + 1} completed. "
@@ -430,6 +407,11 @@ def train():
             torch.save(
                 {
                     "epoch": epoch + 1,
+                    "completed_steps": completed_steps,
+                    "total_steps": total_steps,
+                    "loss_config": asdict(LOSS_CONFIG),
+                    "loss_components": {"ar": total_ar / examples_seen,
+                                        "distance": total_distance / examples_seen},
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "scheduler_state_dict": scheduler.state_dict(),
@@ -449,14 +431,14 @@ def train():
                 "Skipping checkpoint.\n"
             )
 
-    save_training_curves(  
-        step_losses,  
-        step_accuracies,  
-        epoch_losses,  
-        epoch_accuracies,  
-        len(dataloader),  
-        config.CHECKPOINT_DIR,  
-    )  
+    save_training_curves(
+        step_losses,
+        step_accuracies,
+        epoch_losses,
+        epoch_accuracies,
+        len(dataloader),
+        config.CHECKPOINT_DIR,
+    )
 
 
 if __name__ == "__main__":
