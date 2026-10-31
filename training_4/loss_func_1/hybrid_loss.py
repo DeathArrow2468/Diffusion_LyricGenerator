@@ -3,7 +3,7 @@ import math
 import torch
 from torch import nn
 from torch.nn import functional as F
-from loss_func_1.config_loss import HybridLossConfig
+from .config_loss import HybridLossConfig
 
 
 class HybridLoss(nn.Module):
