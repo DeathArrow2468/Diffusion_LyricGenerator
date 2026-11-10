@@ -1,0 +1,19 @@
+Ask some friends to write 5 prompts for a single song with varying factors that is, one prompt should be short and simple,
+another descriptive, semantically rich etc.
+
+Also, pre-process the text to use actual line breaks if possible that is remove \n's and make them 'Enter'
+
+-----------------------------------------------------------------
+
+Try making a loss function that rewards the model for being right rather than punishing the model for being wrong.
+
+-----------------------------------------------------------------
+
+Also, we should make the encoder for the T value injection we do when training the Diffusion model rather than let it train in the epochs!
+
+-----------------------------------------------------------------
+Double models that is, we take an AR and train it on the dataset and then make the output come on to the diffusion model or vice-versa.
+That we we can get the benefits of both the models.
+
+-----------------------------------------------------------------
+Check the grand dataset and remove all the relavent metadata you can such as the number of unique words, how many times they occur, could do n-gram also but maybe upto 3. Other meta data as well so that this is a one time run and make sure u write the results to a txt file.
