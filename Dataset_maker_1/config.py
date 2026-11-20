@@ -3,7 +3,7 @@
 OLLAMA_HOST = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "llama3.2:3b"
 
-INPUT_JSONL = r"C:\Users\Manav\OneDrive\Desktop\Diffusion_LyricGenerator\Genius_Dataset\raw_data.jsonl"
+INPUT_JSONL = "Genius_Dataset/raw_data.jsonl"
 OUTPUT_JSONL = "train_data.jsonl"
 
 SYSTEM_PROMPT = """
