@@ -14,4 +14,4 @@ SEP_TOKEN = "[SEP]"
 MASK_TOKEN = "[MASK]"
 
 # Data Paths
-TRAIN_DATA = "Diffusion_LyricGenerator/Dataset_maker_1/train_data.jsonl"
+TRAIN_DATA = "Dataset_maker_1/train_data.jsonl"
