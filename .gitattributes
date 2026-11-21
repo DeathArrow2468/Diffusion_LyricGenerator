@@ -3,3 +3,4 @@
 Genius_Dataset/output.jsonl filter=lfs diff=lfs merge=lfs -text
 Genius_Dataset/raw.jsonl filter=lfs diff=lfs merge=lfs -text
 Dataset_maker_1/train_data.jsonl filter=lfs diff=lfs merge=lfs -text
+*.sh text eol=lf

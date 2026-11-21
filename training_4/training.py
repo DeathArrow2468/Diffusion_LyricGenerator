@@ -1,4 +1,6 @@
 import math
+import csv
+import time
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -262,6 +264,19 @@ def train(device=None):
     epoch_losses = []
     epoch_accuracies = []
 
+    metrics_path = Path(config.CHECKPOINT_DIR) / "metrics.csv"
+    with metrics_path.open("w", newline="", encoding="utf-8") as handle:
+        csv.writer(handle).writerow([
+            "epoch", "batch", "optimizer_step", "elapsed_seconds",
+            "loss", "ar_loss", "distance_loss", "masked_accuracy", "learning_rate",
+        ])
+    started = time.monotonic()
+    run_config = {key: value for key, value in vars(config).items() if key.isupper()}
+    run_config["loss_config"] = asdict(LOSS_CONFIG)
+    (Path(config.CHECKPOINT_DIR) / "run_config.json").write_text(
+        json.dumps(run_config, indent=2, default=str), encoding="utf-8"
+    )
+
     # ==========================================
     # 3. THE CORE TRAINING LOOP
     # ==========================================
@@ -282,6 +297,8 @@ def train(device=None):
             total=len(dataloader),
             desc=f"Epoch {epoch + 1}/{config.EPOCHS}",
         )
+
+        progress_bar.mininterval = 30.0
 
         for step, batch in progress_bar:
             batch = {key: value.to(device, non_blocking=device.type == "cuda")
@@ -362,6 +379,19 @@ def train(device=None):
                 completed_steps += 1
                 optimizer.zero_grad(set_to_none=True)  # Wipe the accumulated gradients clean
 
+            # Persist each batch so interrupted jobs retain their metric history.
+            with metrics_path.open("a", newline="", encoding="utf-8") as handle:
+                csv.writer(handle).writerow([
+                    epoch + 1, step + 1, completed_steps,
+                    round(time.monotonic() - started, 3), unscaled_loss,
+                    ar_value, distance_value, step_accuracies[-1],
+                    scheduler.get_last_lr()[0],
+                ])
+            if step == 0 or (step + 1) % 100 == 0:
+                print(f"epoch={epoch+1} batch={step+1}/{len(dataloader)} "
+                      f"update={completed_steps} loss={unscaled_loss:.5f} "
+                      f"ar={ar_value:.5f} distance={distance_value:.5f}", flush=True)
+
             # Update progress bar to show both loss and the dynamically changing learning rate
             progress_bar.set_postfix(
                 {
@@ -386,6 +416,12 @@ def train(device=None):
         print(
             f"Epoch {epoch + 1} completed. "
             f"Average Loss: {avg_loss:.4f}"
+        )
+
+        # Refresh the graph every epoch, not only after the complete run.
+        save_training_curves(
+            step_losses, step_accuracies, epoch_losses, epoch_accuracies,
+            len(dataloader), config.CHECKPOINT_DIR,
         )
 
         # We only save the file if this epoch performed strictly better
