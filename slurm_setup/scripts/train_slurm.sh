@@ -16,7 +16,7 @@ if [[ "${1:-}" != "--batch" ]]; then
     export LYRICS_BASE_MODEL="${LYRICS_BASE_MODEL:-$PROJECT_ROOT/pretrained/Qwen2.5-0.5B}"
     export LYRICS_DATASET="${LYRICS_DATASET:-$PROJECT_ROOT/Dataset_maker_1/train_data.jsonl}"
 
-    [[ "$PARTITION" != large-llm ]] || { echo 'Set PARTITION to your actual GPU partition.' >&2; exit 1; }
+    [[ -n "$PARTITION" ]] || { echo 'PARTITION cannot be empty.' >&2; exit 1; }
     for path in "$OUTPUT_ROOT" "$PYTHON_BIN" "$LYRICS_BASE_MODEL" "$LYRICS_DATASET"; do
         [[ "$path" == /* ]] || { echo "Use absolute paths: $path" >&2; exit 1; }
     done
