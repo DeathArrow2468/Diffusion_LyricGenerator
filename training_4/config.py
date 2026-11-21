@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # (e.g., masking_tokenization_2 or diffusion_model_3)
 DATASET_PATH = os.environ.get("LYRICS_DATASET", str(PROJECT_ROOT / "Dataset_maker_1/train_data.jsonl"))
 MODEL_NAME = os.environ.get("LYRICS_BASE_MODEL", "Qwen/Qwen2.5-0.5B")
-MAX_SEQ_LEN = 256
+MAX_SEQ_LEN = 512
 
 # Hardware Optimization for 8GB VRAM
 MICRO_BATCH_SIZE = 2      # How many songs fit in VRAM at once
