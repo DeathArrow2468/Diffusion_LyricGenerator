@@ -6,7 +6,7 @@ set -euo pipefail
 if [[ "${1:-}" != "--batch" ]]; then
     PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
     # Override these through environment variables or edit them in your editor.
-    PARTITION="${large-llm}"
+    PARTITION="${PARTITION:-large-llm}"
     TIME_LIMIT="${TIME_LIMIT:-08:00:00}"
     CPUS="${CPUS:-8}"
     RAM="${RAM:-64G}"                 # System RAM, not VRAM.
